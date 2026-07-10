@@ -3,4 +3,4 @@ target/
 *.log
 .claude-flow/
 .codegraph/
-.omo/evidence/
+.omo/
