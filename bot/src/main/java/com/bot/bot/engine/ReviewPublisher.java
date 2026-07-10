@@ -1,8 +1,11 @@
 package com.bot.bot.engine;
 
 import com.bot.bot.domain.Finding;
+import com.bot.bot.domain.PullRequestContext;
+import com.bot.bot.domain.TriageResult;
 import com.bot.bot.analysis.SummaryGenerator;
 import com.bot.bot.domain.ReviewComment;
+import com.bot.bot.config.ConfigService;
 import com.bot.bot.github.GitHubApiClient;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -18,6 +21,7 @@ import java.util.stream.Collectors;
 public class ReviewPublisher {
     private final GitHubApiClient gitHubApiClient;
     private final SummaryGenerator summaryGenerator;
+    private final ConfigService configService;
 
     public Mono<Void> publishReview(String owner, String repo, int prNumber,
                                      List<Finding> findings, boolean autoApprove,
@@ -48,7 +52,33 @@ public class ReviewPublisher {
                     owner, repo, prNumber, findings.size(), inlineComments.size());
         }
 
-        return gitHubApiClient.submitReview(owner, repo, prNumber, summary, event, inlineComments, installationId);
+        boolean labelsEnabled = configService.resolve(installationId).labelsEnabled();
+        return gitHubApiClient.submitReview(owner, repo, prNumber, summary, event, inlineComments, installationId)
+                .then(applyTriageLabels(owner, repo, prNumber, prContext, installationId, labelsEnabled));
+    }
+
+    /**
+     * Apply triage labels (triage:green/yellow/red, security) based on the computed tier.
+     */
+    private Mono<Void> applyTriageLabels(String owner, String repo, int prNumber,
+                                           PullRequestContext prContext, long installationId,
+                                           boolean labelsEnabled) {
+        if (!labelsEnabled) {
+            return Mono.empty();
+        }
+        TriageResult triage = prContext.getTriageResult();
+        if (triage == null || triage.tier() == null) {
+            return Mono.empty();
+        }
+
+        List<String> labels = new ArrayList<>();
+        labels.add("triage:" + triage.tier().name().toLowerCase());
+        if (Boolean.TRUE.equals(triage.securityFlag())) {
+            labels.add("security");
+        }
+
+        log.info("Applying labels {} to {}/{}/PR#{}", labels, owner, repo, prNumber);
+        return gitHubApiClient.addLabels(owner, repo, prNumber, labels, installationId);
     }
 
     /**

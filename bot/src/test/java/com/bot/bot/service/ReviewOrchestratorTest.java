@@ -2,14 +2,20 @@ package com.bot.bot.service;
 
 import com.bot.bot.analysis.HeuristicsAnalysisEngine;
 import com.bot.bot.analysis.LLMReviewEngine;
+import com.bot.bot.analysis.SummaryGenerator;
 import com.bot.bot.config.AppProperties;
 import com.bot.bot.diff.UnifiedDiffParser;
 import com.bot.bot.domain.ChangeChunk;
 import com.bot.bot.domain.Finding;
 import com.bot.bot.domain.PullRequestContext;
+import com.bot.bot.domain.TriageResult;
+import com.bot.bot.email.ThresholdAlertService;
 import com.bot.bot.engine.FindingMerger;
 import com.bot.bot.engine.ReviewPublisher;
 import com.bot.bot.github.GitHubApiClient;
+import com.bot.bot.persistence.PrAnalysis;
+import com.bot.bot.persistence.PrAnalysisRepository;
+import com.google.gson.Gson;
 import com.google.gson.JsonObject;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -24,9 +30,17 @@ import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import java.util.Collections;
+import java.util.List;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.mockito.ArgumentMatchers.*;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+
 class ReviewOrchestratorTest {
 
-    @Test
+@Test
     void processesPullRequestAndPublishesMergedFindings() {
         GitHubApiClient gitHubApiClient = Mockito.mock(GitHubApiClient.class);
         UnifiedDiffParser diffParser = Mockito.mock(UnifiedDiffParser.class);
@@ -34,14 +48,24 @@ class ReviewOrchestratorTest {
         LLMReviewEngine llmReviewEngine = Mockito.mock(LLMReviewEngine.class);
         FindingMerger findingMerger = Mockito.mock(FindingMerger.class);
         ReviewPublisher reviewPublisher = Mockito.mock(ReviewPublisher.class);
+        SummaryGenerator summaryGenerator = Mockito.mock(SummaryGenerator.class);
         AppProperties appProperties = new AppProperties();
         appProperties.setHeuristicsEnabled(true);
         appProperties.setLlmEnabled(true);
+        PrAnalysisRepository prAnalysisRepository = Mockito.mock(PrAnalysisRepository.class);
+        Gson gson = new Gson();
+        ThresholdAlertService thresholdAlertService = Mockito.mock(ThresholdAlertService.class);
+
+ // Mock the dedup check to return false (not already processed) so test proceeds
+        when(prAnalysisRepository.existsByOwnerRepoPrSha(
+                anyString(), anyString(), anyInt(), anyString())).thenReturn(false);
+        when(prAnalysisRepository.save(any())).thenReturn(null);
 
         ReviewOrchestrator orchestrator = new ReviewOrchestrator(
                 gitHubApiClient, diffParser, heuristicsAnalysisEngine,
                 llmReviewEngine, findingMerger, reviewPublisher,
-                appProperties
+                summaryGenerator, appProperties, prAnalysisRepository, gson,
+                thresholdAlertService
         );
 
         PullRequestContext prContext = PullRequestContext.builder()
@@ -78,7 +102,7 @@ class ReviewOrchestratorTest {
                 .confidence(0.7)
                 .precedenceScore(100)
                 .build();
-        when(heuristicsAnalysisEngine.analyze(List.of(chunk))).thenReturn(List.of(heuristicFinding));
+        when(heuristicsAnalysisEngine.analyze(List.of(chunk), prContext)).thenReturn(List.of(heuristicFinding));
 
         Finding llmFinding = Finding.builder()
                 .id("l1")
@@ -96,8 +120,13 @@ class ReviewOrchestratorTest {
 
         List<Finding> merged = List.of(heuristicFinding, llmFinding);
         when(findingMerger.mergeAndRank(any())).thenReturn(merged);
-        // Match the 8-arg publishReview call (with installationId)
-        when(reviewPublisher.publishReview(anyString(), anyString(), anyInt(), anyList(), anyBoolean(), anyBoolean(), anyLong()))
+
+        when(summaryGenerator.generateSummary(any(), anyList())).thenReturn("summary");
+        when(summaryGenerator.computeTier(anyList(), any()))
+                .thenReturn(new TriageResult(TriageResult.Tier.RED, true, TriageResult.SuggestedAction.MANUAL_CHECK));
+
+        // Match the 8-arg publishReview call (with installationId + prContext)
+        when(reviewPublisher.publishReview(anyString(), anyString(), anyInt(), anyList(), anyBoolean(), anyBoolean(), anyLong(), any()))
                 .thenReturn(Mono.empty());
 
         JsonObject webhookData = new JsonObject();
@@ -107,5 +136,7 @@ class ReviewOrchestratorTest {
         verify(findingMerger).mergeAndRank(captor.capture());
         List<Finding> allFindings = captor.getValue();
         assertEquals(2, allFindings.size());
+
+        verify(thresholdAlertService).maybeAlert(any(PrAnalysis.class));
     }
 }
