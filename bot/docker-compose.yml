@@ -1,0 +1,83 @@
+version: '3.8'
+
+services:
+  # ── NVIDIA NIM (self-hosted, requires NVIDIA GPU + container toolkit) ──
+  # Uncomment and configure this if running NIM locally instead of using
+  # the hosted NVIDIA API (integrate.api.nvidia.com).
+  # See: https://build.nvidia.com/explore/discover
+  #
+  # nim:
+  #   image: nvcr.io/nvidia/nim-llm:latest
+  #   container_name: pr-review-nim
+  #   runtime: nvidia
+  #   ports:
+  #     - "8000:8000"
+  #   environment:
+  #     - NVIDIA_VISIBLE_DEVICES=all
+  #     - MODEL_NAME=${NIM_MODEL:-meta/llama-3.1-8b-instruct}
+  #   volumes:
+  #     - nim-cache:/model-cache
+  #   healthcheck:
+  #     test: ["CMD", "curl", "-sf", "http://localhost:8000/v1/models"]
+  #     interval: 30s
+  #     timeout: 10s
+  #     retries: 5
+  #     start_period: 120s
+  #   restart: unless-stopped
+
+  # ── Ollama (CPU-friendly alternative, no GPU required) ──────────────
+  # Uncomment and set LLM_PROVIDER=ollama / LLM_BASE_URL=http://ollama:11434
+  #
+  # ollama:
+  #   image: ollama/ollama:latest
+  #   container_name: pr-review-ollama
+  #   ports:
+  #     - "11434:11434"
+  #   volumes:
+  #     - ollama_data:/root/.ollama
+  #   environment:
+  #     - OLLAMA_HOST=0.0.0.0:11434
+  #   command: serve
+  #   healthcheck:
+  #     test: ["CMD", "ollama", "list"]
+  #     interval: 30s
+  #     timeout: 10s
+  #     retries: 5
+  #     start_period: 40s
+  #   restart: unless-stopped
+
+  # ── Glint — AI PR Review Bot ───────────────────────────────────────
+  glint:
+    build: .
+    container_name: glint
+    ports:
+      - "${PORT:-8080}:8080"
+    env_file:
+      - .env
+    environment:
+      # Default: NVIDIA NIM (requires LLM_API_KEY for hosted API)
+      - LLM_PROVIDER=${LLM_PROVIDER:-nvidia-nim}
+      - LLM_MODEL=${LLM_MODEL:-meta/llama-3.1-8b-instruct}
+      - LLM_BASE_URL=${LLM_BASE_URL:-http://localhost:8000}
+      - LLM_API_KEY=${LLM_API_KEY:-}
+      # Ollama alternative (uncomment and adjust):
+      # - LLM_PROVIDER=ollama
+      # - LLM_BASE_URL=http://ollama:11434
+      # - LLM_MODEL=qwen2.5-coder:7b
+      #
+      # Hosted NVIDIA API alternative:
+      # - LLM_BASE_URL=https://integrate.api.nvidia.com/v1
+      # - LLM_API_KEY=nvapi-...
+    volumes:
+      - ./certs:/app/certs:ro
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://localhost:8080/actuator/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+    restart: unless-stopped
+
+volumes:
+  ollama_data:
+  nim-cache:

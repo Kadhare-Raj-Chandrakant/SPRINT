@@ -1,0 +1,103 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Structured logging configuration for PR Review Bot.
+  - Local/dev: human-readable console with colors
+  - Production: JSON output via LogstashEncoder for log aggregation (ELK, Datadog, etc.)
+  - MDC fields: traceId, eventType, deliveryId, owner, repo, prNumber
+-->
+<configuration>
+    <!-- Spring Boot defaults as base -->
+    <include resource="org/springframework/boot/logging/logback/defaults.xml"/>
+
+    <!-- ============================================================ -->
+    <!-- Properties                                                    -->
+    <!-- ============================================================ -->
+    <property name="CONSOLE_LOG_PATTERN"
+              value="%clr(%d{yyyy-MM-dd HH:mm:ss.SSS}){faint} %clr(%5p) %clr([%15.15t]){faint} %clr(%-40.40logger{39}){cyan} %clr(%X{traceId:-no-trace}){magenta} %m%n%wEx"/>
+
+    <property name="JSON_LOG_DIR" value="${JSON_LOG_DIR:-./logs}"/>
+    <!-- Set to "json" to enable JSON logging instead of console pattern -->
+    <property name="LOG_FORMAT" value="${LOG_FORMAT:-console}"/>
+
+    <!-- ============================================================ -->
+    <!-- Appender: Human-readable console                             -->
+    <!-- ============================================================ -->
+    <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder>
+            <pattern>${CONSOLE_LOG_PATTERN}</pattern>
+        </encoder>
+    </appender>
+
+    <!-- ============================================================ -->
+    <!-- Appender: Structured JSON (Logstash)                         -->
+    <!-- ============================================================ -->
+    <appender name="JSON_FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
+        <file>${JSON_LOG_DIR}/bot.json</file>
+        <rollingPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedRollingPolicy">
+            <fileNamePattern>${JSON_LOG_DIR}/bot.%d{yyyy-MM-dd}.%i.json</fileNamePattern>
+            <maxFileSize>50MB</maxFileSize>
+            <maxHistory>7</maxHistory>
+            <totalSizeCap>500MB</totalSizeCap>
+        </rollingPolicy>
+        <encoder class="net.logstash.logback.encoder.LoggingEventCompositeJsonEncoder">
+            <providers>
+                <timestamp>
+                    <timeZone>UTC</timeZone>
+                </timestamp>
+                <loggerName/>
+                <threadName/>
+                <logLevel/>
+                <message/>
+                <mdc/>
+                <stackTrace>
+                    <throwableConverter class="net.logstash.logback.stacktrace.ShortenedThrowableConverter">
+                        <maxDepthPerThrowable>30</maxDepthPerThrowable>
+                        <maxLength>2048</maxLength>
+                    </throwableConverter>
+                </stackTrace>
+                <contextName/>
+                <arguments/>
+            </providers>
+        </encoder>
+    </appender>
+
+    <!-- ============================================================ -->
+    <!-- Conditional: JSON to stdout (for Docker/k8s)                 -->
+    <!-- ============================================================ -->
+    <appender name="JSON_STDOUT" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder class="net.logstash.logback.encoder.LoggingEventCompositeJsonEncoder">
+            <providers>
+                <timestamp>
+                    <timeZone>UTC</timeZone>
+                </timestamp>
+                <loggerName/>
+                <threadName/>
+                <logLevel/>
+                <message/>
+                <mdc/>
+                <stackTrace>
+                    <throwableConverter class="net.logstash.logback.stacktrace.ShortenedThrowableConverter">
+                        <maxDepthPerThrowable>30</maxDepthPerThrowable>
+                        <maxLength>2048</maxLength>
+                    </throwableConverter>
+                </stackTrace>
+                <contextName/>
+            </providers>
+        </encoder>
+    </appender>
+
+    <!-- ============================================================ -->
+    <!-- Root Logger                                                   -->
+    <!-- ============================================================ -->
+    <root level="INFO">
+        <appender-ref ref="CONSOLE"/>
+    </root>
+
+    <!-- JSON output when LOG_FORMAT=json -->
+    <springProfile name="json-logging">
+        <root level="INFO">
+            <appender-ref ref="JSON_STDOUT"/>
+        </root>
+    </springProfile>
+
+</configuration>

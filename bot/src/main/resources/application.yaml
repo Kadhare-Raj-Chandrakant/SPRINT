@@ -1,0 +1,90 @@
+# ══════════════════════════════════════════════════════════════════════
+# Application configuration for the GitHub PR Review Bot.
+# ══════════════════════════════════════════════════════════════════════
+
+spring:
+  application:
+    name: glint
+
+  # Graceful shutdown - let in-flight reviews complete before exiting
+  lifecycle:
+    timeout-per-shutdown-phase: 30s
+
+# ── Server ───────────────────────────────────────────────────────────
+server:
+  port: ${PORT:8080}
+  address: 0.0.0.0
+  shutdown: graceful
+
+  # Limit incoming webhook payload to 5 MB
+  tomcat:
+    max-swallow-size: 5MB
+    max-http-form-post-size: 5MB
+
+  servlet:
+    context-path: /
+
+# ── WebFlux (for WebClient) ──────────────────────────────────────────
+spring.webflux:
+  base-path: /
+
+# ── Structured Logging ───────────────────────────────────────────────
+# Logstash Logback encoder is configured in logback-spring.xml.
+# This section controls log levels only.
+logging:
+  level:
+    root: INFO
+    com.bot.bot: DEBUG
+    # Suppress noisy netty/reactor wire logs
+    reactor.netty: WARN
+    io.netty: WARN
+
+# ── Actuator (Health, Metrics) ───────────────────────────────────────
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus,metrics
+  endpoint:
+    health:
+      show-details: when-authorized
+      show-components: when-authorized
+    prometheus:
+      enabled: true
+    metrics:
+      enabled: true
+  metrics:
+    tags:
+      application: ${spring.application.name}
+    export:
+      prometheus:
+        enabled: true
+  # Include all health indicators (including custom ones)
+  health:
+    defaults:
+      enabled: true
+
+# ── GitHub App Configuration ─────────────────────────────────────────
+github:
+  app-id: ${GITHUB_APP_ID:}
+  client-id: ${GITHUB_CLIENT_ID:}
+  webhook-secret: ${GITHUB_WEBHOOK_SECRET:}
+  private-key-path: ${GITHUB_PRIVATE_KEY_PATH:certs/private-key.pem}
+  api-url: ${GITHUB_API_URL:https://api.github.com}
+
+# ── LLM Configuration ────────────────────────────────────────────────
+llm:
+  provider: ${LLM_PROVIDER:nvidia-nim}
+  model: ${LLM_MODEL:meta/llama-3.1-8b-instruct}
+  base-url: ${LLM_BASE_URL:http://localhost:8000}
+  timeout-seconds: ${LLM_TIMEOUT_SECONDS:60}
+  enabled: ${LLM_ENABLED:true}
+  api-key: ${LLM_API_KEY:}
+
+# ── Application Configuration ────────────────────────────────────────
+app:
+  heuristics-enabled: ${HEURISTICS_ENABLED:true}
+  llm-enabled: ${LLM_ENABLED:true}
+  auto-approve: ${AUTO_APPROVE:false}
+  inline-comments: ${INLINE_COMMENTS:true}
+  review-summary-enabled: ${REVIEW_SUMMARY_ENABLED:true}
