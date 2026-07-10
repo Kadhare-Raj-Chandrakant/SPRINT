@@ -10,6 +10,28 @@ spring:
   lifecycle:
     timeout-per-shutdown-phase: 30s
 
+  # ── Database ──────────────────────────────────────────────────────
+  datasource:
+    url: ${DATABASE_URL:jdbc:postgresql://localhost:5432/pr_triage}
+    username: ${DATABASE_USER:postgres}
+    password: ${DATABASE_PASSWORD:postgres}
+    driver-class-name: org.postgresql.Driver
+    hikari:
+      maximum-pool-size: ${DATABASE_POOL_SIZE:10}
+      minimum-idle: ${DATABASE_MIN_IDLE:2}
+
+  jpa:
+    hibernate:
+      ddl-auto: update
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+        jdbc:
+          lob:
+            non_contextual_creation: true
+    show-sql: false
+    open-in-view: false
+
 # ── Server ───────────────────────────────────────────────────────────
 server:
   port: ${PORT:8080}
@@ -88,3 +110,12 @@ app:
   auto-approve: ${AUTO_APPROVE:false}
   inline-comments: ${INLINE_COMMENTS:true}
   review-summary-enabled: ${REVIEW_SUMMARY_ENABLED:true}
+  mail:
+    enabled: ${MAIL_ENABLED:false}
+    host: ${MAIL_HOST:}
+    port: ${MAIL_PORT:25}
+    username: ${MAIL_USERNAME:}
+    password: ${MAIL_PASSWORD:}
+    from: ${MAIL_FROM:}
+    digest-cron: ${MAIL_DIGEST_CRON:0 0 18 * * *}
+    maintainer-emails: ${MAIL_MAINTAINERS:}

@@ -3,6 +3,9 @@ package com.bot.bot.config;
 import io.netty.channel.ChannelOption;
 import io.netty.handler.timeout.ReadTimeoutHandler;
 import io.netty.handler.timeout.WriteTimeoutHandler;
+import com.bot.bot.llm.LLMClient;
+import com.bot.bot.llm.LLMFallbackChain;
+import com.bot.bot.llm.OpenAiCompatibleClient;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.client.reactive.ReactorClientHttpConnector;
@@ -56,6 +59,15 @@ public class WebClientConfig {
     @Bean
     public WebClient webClient(WebClient.Builder builder) {
         return builder.build();
+    }
+
+    /**
+     * Primary LLM client with fallback chain.
+     * Tries providers in configured order; falls back on failure.
+     */
+    @Bean
+    public LLMClient llmClient(LLMProperties llmProperties) {
+        return new LLMFallbackChain(llmProperties);
     }
 
     // ── HttpClient with connection pool + timeouts ──────────────────
