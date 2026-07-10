@@ -1,5 +1,6 @@
 package com.bot.bot.analysis.heuristics;
 
+import com.bot.bot.analysis.Rule;
 import com.bot.bot.domain.ChangeChunk;
 import com.bot.bot.domain.Finding;
 import lombok.extern.slf4j.Slf4j;
@@ -14,7 +15,7 @@ import java.util.regex.Pattern;
 public class BoilerplatePhraseRule implements Rule {
 
     // Common AI boilerplate phrases
-    private static final Pattern BOILERPLATE_PHRASE_PATTERN = Pattern.compile("\b(?:This ensures optimal|Here's an improved version|This fixes|This resolves|This adds|This updates|This improves|This changes|This refactors|This is a fix for|This is an improvement|This is a change|This is a refactor|This PR introduces|This PR fixes|This PR updates|This PR improves|This PR changes|This PR refactors)\\\", Pattern.CASE_INSENSITIVE);
+    private static final Pattern BOILERPLATE_PHRASE_PATTERN = Pattern.compile("\\b(?:This ensures optimal|Here's an improved version|This fixes|This resolves|This adds|This updates|This improves|This changes|This refactors|This is a fix for|This is an improvement|This is a change|This is a refactor|This PR introduces|This PR fixes|This PR updates|This PR improves|This PR changes|This PR refactors)\\b", Pattern.CASE_INSENSITIVE);
 
     @Override
     public List<Finding> analyze(List<ChangeChunk> chunks) {
@@ -45,5 +46,10 @@ public class BoilerplatePhraseRule implements Rule {
         }
 
         return findings;
+    }
+
+    @Override
+    public String getName() {
+        return "BoilerplatePhraseRule";
     }
 }

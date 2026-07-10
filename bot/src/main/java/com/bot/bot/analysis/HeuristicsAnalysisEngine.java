@@ -36,7 +36,7 @@ public class HeuristicsAnalysisEngine {
             futures.add(CompletableFuture.supplyAsync(() -> secretsDetectionRule.analyze(chunks), executor));
             futures.add(CompletableFuture.supplyAsync(() -> commitMessageStyleRule.analyze(chunks), executor));
             futures.add(CompletableFuture.supplyAsync(() -> diffShapeRule.analyze(chunks), executor));
-            futures.add(CompletableFuture.supplyAsync(() -> accountAgeRule.analyze(chunks, prContext), executor));
+            futures.add(CompletableFuture.supplyAsync(() -> accountAgeRule.analyze(chunks), executor));
             futures.add(CompletableFuture.supplyAsync(() -> commentCodeRatioRule.analyze(chunks), executor));
             futures.add(CompletableFuture.supplyAsync(() -> boilerplatePhraseRule.analyze(chunks), executor));
 

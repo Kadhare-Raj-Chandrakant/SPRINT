@@ -6,6 +6,6 @@ import com.bot.bot.domain.Finding;
 import java.util.List;
 
 public interface Rule {
-    List<Finding> analyze(ChangeChunk chunk);
+    List<Finding> analyze(List<ChangeChunk> chunks);
     String getName();
 }

@@ -46,7 +46,7 @@ class SummaryGeneratorTest {
         assertTrue(summary.contains("Title: Fix login bug"));
         assertTrue(summary.contains("Purpose: This fixes a bug in the login process."));
         assertTrue(summary.contains("AI-likelihood: LOW"));
-        assertTrue(summary.contains("No reasoning provided."));
+        assertTrue(summary.contains("Clearly human-written, no signs of AI assistance."));
     }
 
     @Test
@@ -77,7 +77,7 @@ class SummaryGeneratorTest {
         // Verify summary contains expected information
         assertTrue(summary.contains("Title: Update dependencies"));
         assertTrue(summary.contains("Risk: CRITICAL"));
-        assertTrue(summary.contains("Likely low-effort, consider closing"));
+        assertTrue(summary.contains("Needs human review"));
     }
 
     @Test

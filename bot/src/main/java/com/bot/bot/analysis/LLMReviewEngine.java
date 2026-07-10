@@ -102,7 +102,7 @@ public class LLMReviewEngine {
                 - HIGH: Likely AI-generated or heavily assisted
 
                 Include reasoning for your classification.
-                "}"",
+                """,
                 chunk.getFilePath(),
                 chunk.getChangeType(),
                 added,
@@ -226,16 +226,16 @@ public class LLMReviewEngine {
                         .id(UUID.randomUUID().toString())
                         .filePath(chunk.getFilePath())
                         .lineNumber(chunk.getStartLine())
-                        .severity("CRITICAL")
+                        .severity("INFO")
                         .category("AI_LIKELIHOOD")
                         .message(trimmed)
                         .source("LLM")
                         .confidence(0.85)
-                        .precedenceScore(750)
+                        .precedenceScore(550)
                         .build());
             }
         }
 
         return findings;
-    }}
+    }
 }

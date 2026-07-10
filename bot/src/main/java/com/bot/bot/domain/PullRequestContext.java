@@ -5,6 +5,8 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.util.List;
+
 @Data
 @Builder
 @NoArgsConstructor
@@ -20,4 +22,6 @@ public class PullRequestContext {
     private String headRef;
     private String commitSha;
     private long installationId;
+    private List<String> filesChanged;
+    private TriageResult triageResult;
 }
