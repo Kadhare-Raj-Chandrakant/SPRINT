@@ -13,4 +13,6 @@ public class AppProperties {
     private boolean autoApprove = false;
     private boolean inlineComments = true;
     private boolean reviewSummaryEnabled = true;
+    private String actionSecret;
+    private String baseUrl;
 }
