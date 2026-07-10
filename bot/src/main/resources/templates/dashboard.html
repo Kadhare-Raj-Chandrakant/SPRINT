@@ -1,0 +1,46 @@
+<!doctype html>
+<html xmlns:th="http://www.thymeleaf.org" lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <title>PR Triage Dashboard</title>
+    <style>
+        body { font-family: system-ui, sans-serif; margin: 0; background: #f6f8fa; color: #1f2328; }
+        h1 { padding: 1rem 1.5rem; margin: 0; background: #24292f; color: #fff; font-size: 1.1rem; }
+        table { width: 100%; border-collapse: collapse; background: #fff; }
+        th, td { padding: .6rem .8rem; text-align: left; border-bottom: 1px solid #eaecef; vertical-align: top; }
+        th { background: #f6f8fa; font-size: .8rem; text-transform: uppercase; letter-spacing: .03em; }
+        .btn { display: inline-block; padding: .25rem .6rem; margin-right: .3rem; border-radius: 6px;
+               background: #1f883d; color: #fff; text-decoration: none; font-size: .8rem; }
+        .btn.danger { background: #cf222e; }
+        .done { color: #1a7f37; font-weight: 600; }
+        .empty { text-align: center; color: #656d76; padding: 2rem; }
+    </style>
+</head>
+<body>
+<h1>PR Triage Dashboard</h1>
+<table>
+    <thead>
+    <tr><th>Tier</th><th>PR</th><th>Summary</th><th>Actions</th></tr>
+    </thead>
+    <tbody>
+    <tr th:if="${empty}">
+        <td colspan="4" class="empty">No PRs analyzed yet.</td>
+    </tr>
+    <tr th:each="r : ${rows}">
+        <td th:text="${r.tier} + ' ' + ${r.emoji}">TIER</td>
+        <td th:text="${r.pr}">PR</td>
+        <td th:text="${r.summary}">summary</td>
+        <td>
+            <span th:if="${r.actioned}" class="done">ACTIONED</span>
+            <span th:unless="${r.actioned}">
+                <a class="btn" th:href="${r.approveUrl}">Approve</a>
+                <a class="btn" th:href="${r.changesUrl}">Request changes</a>
+                <a class="btn danger" th:href="${r.closeUrl}">Close</a>
+            </span>
+        </td>
+    </tr>
+    </tbody>
+</table>
+</body>
+</html>
