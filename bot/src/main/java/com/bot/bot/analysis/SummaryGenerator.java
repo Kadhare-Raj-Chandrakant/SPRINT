@@ -2,10 +2,10 @@ package com.bot.bot.analysis;
 
 import com.bot.bot.domain.Finding;
 import com.bot.bot.domain.PullRequestContext;
+import com.bot.bot.domain.TriageResult;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
-import reactor.core.publisher.Mono;
 
 import java.util.List;
 import java.util.stream.Collectors;
@@ -32,12 +32,14 @@ public class SummaryGenerator {
         // Extract quality signal from findings
         String qualitySignal = extractQualitySignal(findings);
 
-        // Determine recommendation based on AI-likelihood and risk
-        String recommendation = determineRecommendation(aiLikelihood, riskLevel);
+        // Use computeTier for recommendation
+        TriageResult triage = computeTier(findings, prContext);
+        String recommendation = tierToRecommendation(triage);
 
         // Build the summary
         return String.format(
-                """Title: %s
+                """
+Title: %s
 Purpose: %s
 Scope: %s
 Risk: %s
@@ -212,5 +214,68 @@ Recommendation: %s
         } else {
             return "Needs manual inspection.";
         }
+    }
+
+    /**
+     * Computes the triage tier for a PR based on SRS §5 criteria.
+     *
+     * @param findings  list of analysis findings (nullable)
+     * @param ctx       pull request context with filesChanged and metadata
+     * @return TriageResult with tier, securityFlag, and suggestedAction
+     */
+    public TriageResult computeTier(List<Finding> findings, PullRequestContext ctx) {
+        if (findings == null) findings = List.of();
+        List<String> filesChanged = ctx.getFilesChanged();
+        if (filesChanged == null) filesChanged = List.of();
+
+        // Signal extraction
+        String aiLikelihood = extractAILikelihood(findings);
+
+        boolean hasSecurityFinding = findings.stream()
+                .anyMatch(f -> "SECURITY".equals(f.getCategory()));
+
+        boolean hasTemplatedSignal = findings.stream()
+                .anyMatch(f -> "AI_LIKELIHOOD".equals(f.getCategory())
+                        && f.getMessage() != null
+                        && f.getMessage().toLowerCase().contains("boilerplate"));
+
+        boolean sweepingUnrelated = filesChanged.size() > 10;
+
+        boolean noClearIntent = ctx.getDescription() == null || ctx.getDescription().isBlank();
+
+        boolean hasTests = findings.stream()
+                .anyMatch(f -> "POSITIVE_OBSERVATION".equals(f.getCategory())
+                        && f.getMessage() != null
+                        && f.getMessage().toLowerCase().contains("test"))
+                || filesChanged.stream().anyMatch(f -> {
+                    String lower = f.toLowerCase();
+                    return lower.contains("test") || lower.contains("spec");
+                });
+
+        boolean isCoherent = !noClearIntent && !sweepingUnrelated;
+
+        // RED: templated + sweeping-unrelated changes + no clear intent
+        if (hasTemplatedSignal && sweepingUnrelated && noClearIntent) {
+            return new TriageResult(TriageResult.Tier.RED, hasSecurityFinding,
+                    TriageResult.SuggestedAction.CONSIDER_CLOSING);
+        }
+
+        // GREEN: coherent + low AI-likelihood + has tests (securityFlag is a separate axis)
+        if (isCoherent && "LOW".equals(aiLikelihood) && hasTests) {
+            return new TriageResult(TriageResult.Tier.GREEN, hasSecurityFinding,
+                    TriageResult.SuggestedAction.REVIEW_AND_MERGE);
+        }
+
+        // YELLOW: everything else (mixed/complex/off-topic/moderate AI)
+        return new TriageResult(TriageResult.Tier.YELLOW, hasSecurityFinding,
+                TriageResult.SuggestedAction.MANUAL_CHECK);
+    }
+
+    private String tierToRecommendation(TriageResult triage) {
+        return switch (triage.tier()) {
+            case GREEN -> "Merge-worthy.";
+            case YELLOW -> "Needs human review.";
+            case RED -> "Likely low-effort, consider closing.";
+        };
     }
 }

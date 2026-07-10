@@ -63,7 +63,7 @@ class CommitMessageStyleRuleTest {
         List<ChangeChunk> chunks = new ArrayList<>();
         ChangeChunk chunk = new ChangeChunk();
         chunk.setFilePath("src/example.js");
-        chunk.setContext("Fix login bug");
+        chunk.setContext("Remove deprecated API endpoint");
         chunks.add(chunk);
 
         // Analyze

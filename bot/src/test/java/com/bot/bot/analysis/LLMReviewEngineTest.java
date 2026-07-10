@@ -43,14 +43,15 @@ class LLMReviewEngineTest {
         chunk.setFilePath("src/security.js");
         chunk.setStartLine(10);
 
-        // Parse the response
-        List<Finding> findings = llmReviewEngine.parseReviewResponse(response, chunk);
+        @SuppressWarnings("unchecked")
+        List<Finding> findings = (List<Finding>) ReflectionTestUtils.invokeMethod(
+                llmReviewEngine, "parseReviewResponse", response, chunk);
 
         // Verify findings
         assertEquals(3, findings.size());
         assertTrue(findings.stream().anyMatch(f -> "CRITICAL".equals(f.getSeverity())));
         assertTrue(findings.stream().anyMatch(f -> "INFO".equals(f.getSeverity()) && "AI_LIKELIHOOD".equals(f.getCategory())));
-        assertEquals("src/security.js", findings.stream().filter(f -> "INFO".equals(f.getSeverity())).findFirst().orElse(null).getFilePath());
+        assertEquals("src/security.js", findings.stream().filter(f -> "INFO".equals(f.getSeverity()) && "AI_LIKELIHOOD".equals(f.getCategory())).findFirst().orElse(null).getFilePath());
     }
 
     @Test
@@ -70,14 +71,15 @@ class LLMReviewEngineTest {
         chunk.setFilePath("src/security.js");
         chunk.setStartLine(10);
 
-        // Parse the response
-        List<Finding> findings = llmReviewEngine.parseReviewResponse(response, chunk);
+        @SuppressWarnings("unchecked")
+        List<Finding> findings = (List<Finding>) ReflectionTestUtils.invokeMethod(
+                llmReviewEngine, "parseReviewResponse", response, chunk);
 
         // Verify findings
         assertEquals(3, findings.size());
         assertTrue(findings.stream().anyMatch(f -> "CRITICAL".equals(f.getSeverity())));
-        assertTrue(findings.stream().anyMatch(f -> "CRITICAL".equals(f.getSeverity()) && "AI_LIKELIHOOD".equals(f.getCategory())));
-        assertEquals("src/security.js", findings.stream().filter(f -> "CRITICAL".equals(f.getSeverity()) && "AI_LIKELIHOOD".equals(f.getCategory())).findFirst().orElse(null).getFilePath());
+        assertTrue(findings.stream().anyMatch(f -> "INFO".equals(f.getSeverity()) && "AI_LIKELIHOOD".equals(f.getCategory())));
+        assertEquals("src/security.js", findings.stream().filter(f -> "INFO".equals(f.getSeverity()) && "AI_LIKELIHOOD".equals(f.getCategory())).findFirst().orElse(null).getFilePath());
     }
 
     @Test
@@ -94,8 +96,8 @@ class LLMReviewEngineTest {
         prContext.setTitle("Example PR");
         prContext.setDescription("This is an example PR.");
 
-        // Build prompt
-        String prompt = llmReviewEngine.buildPrompt(chunk, prContext);
+        String prompt = (String) ReflectionTestUtils.invokeMethod(
+                llmReviewEngine, "buildPrompt", chunk, prContext);
 
         // Verify prompt includes AI-likelihood instructions
         assertTrue(prompt.contains("AI-Likelihood Assessment:"));

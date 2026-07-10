@@ -22,24 +22,26 @@ public class SecretsDetectionRule implements Rule {
     );
 
     @Override
-    public List<Finding> analyze(ChangeChunk chunk) {
+    public List<Finding> analyze(List<ChangeChunk> chunks) {
         List<Finding> findings = new ArrayList<>();
 
-        for (String addedLine : chunk.getAddedLines()) {
-            for (Map.Entry<String, Pattern> entry : SECRET_PATTERNS.entrySet()) {
-                if (entry.getValue().matcher(addedLine).find()) {
-                    findings.add(Finding.builder()
-                            .id(UUID.randomUUID().toString())
-                            .filePath(chunk.getFilePath())
-                            .lineNumber(chunk.getStartLine())
-                            .severity("CRITICAL")
-                            .category("SECURITY")
-                            .message("Potential " + entry.getKey() + " detected in code")
-                            .suggestion("Remove secret and rotate credentials if already exposed")
-                            .source("HEURISTIC")
-                            .confidence(0.95)
-                            .precedenceScore(1000)
-                            .build());
+        for (ChangeChunk chunk : chunks) {
+            for (String addedLine : chunk.getAddedLines()) {
+                for (Map.Entry<String, Pattern> entry : SECRET_PATTERNS.entrySet()) {
+                    if (entry.getValue().matcher(addedLine).find()) {
+                        findings.add(Finding.builder()
+                                .id(UUID.randomUUID().toString())
+                                .filePath(chunk.getFilePath())
+                                .lineNumber(chunk.getStartLine())
+                                .severity("CRITICAL")
+                                .category("SECURITY")
+                                .message("Potential " + entry.getKey() + " detected in code")
+                                .suggestion("Remove secret and rotate credentials if already exposed")
+                                .source("HEURISTIC")
+                                .confidence(0.95)
+                                .precedenceScore(1000)
+                                .build());
+                    }
                 }
             }
         }

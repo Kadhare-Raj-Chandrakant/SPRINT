@@ -1,5 +1,6 @@
 package com.bot.bot.analysis.heuristics;
 
+import com.bot.bot.analysis.Rule;
 import com.bot.bot.domain.ChangeChunk;
 import com.bot.bot.domain.Finding;
 import lombok.extern.slf4j.Slf4j;
@@ -29,8 +30,8 @@ public class CommitMessageStyleRule implements Rule {
         }
 
         // Patterns for generic/templated commit messages
-        Pattern genericMessagePattern = Pattern.compile("\b(?:fix|update|add|improve|change|refactor|bump|update|patch|fixes?|implements?|adds?|changes?|fixes?|updates?|refactors?|improves?|\w+\s+issue|\w+\s+bug|\w+\s+feature)\\\", Pattern.CASE_INSENSITIVE);
-        Pattern boilerplatePattern = Pattern.compile("\b(?:This ensures optimal|Here's an improved version|This fixes|This resolves|This adds|This updates|This improves|This changes|This refactors|This is a fix for|This is an improvement|This is a change|This is a refactor)\\\", Pattern.CASE_INSENSITIVE);
+        Pattern genericMessagePattern = Pattern.compile("\\b(?:fix|update|add|improve|change|refactor|bump|update|patch|fixes?|implements?|adds?|changes?|fixes?|updates?|refactors?|improves?|\\w+\\s+issue|\\w+\\s+bug|\\w+\\s+feature)\\b", Pattern.CASE_INSENSITIVE);
+        Pattern boilerplatePattern = Pattern.compile("\\b(?:This ensures optimal|Here's an improved version|This fixes|This resolves|This adds|This updates|This improves|This changes|This refactors|This is a fix for|This is an improvement|This is a change|This is a refactor)\\b", Pattern.CASE_INSENSITIVE);
 
         // Check for generic message style
         if (genericMessagePattern.matcher(prDescription).find()) {
@@ -63,5 +64,10 @@ public class CommitMessageStyleRule implements Rule {
         }
 
         return findings;
+    }
+
+    @Override
+    public String getName() {
+        return "CommitMessageStyleRule";
     }
 }
