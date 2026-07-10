@@ -10,9 +10,14 @@ import com.bot.bot.diff.UnifiedDiffParser;
 import com.bot.bot.domain.ChangeChunk;
 import com.bot.bot.domain.Finding;
 import com.bot.bot.domain.PullRequestContext;
+import com.bot.bot.domain.TriageResult;
 import com.bot.bot.engine.FindingMerger;
 import com.bot.bot.engine.ReviewPublisher;
 import com.bot.bot.github.GitHubApiClient;
+import com.bot.bot.email.ThresholdAlertService;
+import com.bot.bot.persistence.PrAnalysis;
+import com.bot.bot.persistence.PrAnalysisRepository;
+import com.google.gson.Gson;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Async;
@@ -21,6 +26,7 @@ import reactor.core.publisher.Mono;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.stream.Collectors;
 
 @Slf4j
 @Service
@@ -34,6 +40,9 @@ public class ReviewOrchestrator {
     private final ReviewPublisher reviewPublisher;
     private final SummaryGenerator summaryGenerator;
     private final AppProperties appProperties;
+    private final PrAnalysisRepository prAnalysisRepository;
+    private final Gson gson;
+    private final ThresholdAlertService thresholdAlertService;
 
     /**
      * Process pull request asynchronously.
@@ -56,6 +65,16 @@ public class ReviewOrchestrator {
      */
     private Mono<Void> processPullRequestContext(PullRequestContext prContext) {
         long installationId = prContext.getInstallationId();
+        String commitSha = prContext.getCommitSha();
+
+        // T7: Skip analysis if this commit SHA was already analyzed
+        if (prAnalysisRepository.existsByOwnerRepoPrSha(
+                prContext.getOwner(), prContext.getRepo(), prContext.getPrNumber(), commitSha)) {
+            log.info("No changes since {} for {}/{}/PR#{} — skipping analysis",
+                    commitSha, prContext.getOwner(), prContext.getRepo(), prContext.getPrNumber());
+            return Mono.empty();
+        }
+
         log.info("Processing PR {}/{}/#{} (installation {})",
                 prContext.getOwner(), prContext.getRepo(), prContext.getPrNumber(), installationId);
 
@@ -63,7 +82,12 @@ public class ReviewOrchestrator {
                         prContext.getPrNumber(), installationId)
                 .map(diff -> {
                     List<ChangeChunk> chunks = diffParser.parse(diff);
-                    log.info("Parsed {} change chunks", chunks.size());
+                    prContext.setFilesChanged(chunks.stream()
+                            .map(ChangeChunk::getFilePath)
+                            .distinct()
+                            .collect(Collectors.toList()));
+                    log.info("Parsed {} change chunks, {} unique files",
+                            chunks.size(), prContext.getFilesChanged().size());
                     return chunks;
                 })
                 .flatMap(chunks -> analyzeDiff(prContext, chunks))
@@ -119,6 +143,12 @@ public class ReviewOrchestrator {
         List<Finding> rankedFindings = findingMerger.mergeAndRank(findings);
         log.info("Final {} findings after deduplication and ranking", rankedFindings.size());
 
+        // Compute triage tier and attach to context
+        TriageResult triageResult = summaryGenerator.computeTier(rankedFindings, prContext);
+        prContext.setTriageResult(triageResult);
+        log.info("Triage tier: {} (security={}, action={})",
+                triageResult.tier(), triageResult.securityFlag(), triageResult.suggestedAction());
+
         // Generate structured summary
         String summary = summaryGenerator.generateSummary(prContext, rankedFindings);
         log.info("Generated structured summary for PR {}/{}/#{}:", prContext.getOwner(), prContext.getRepo(), prContext.getPrNumber());
@@ -141,6 +171,59 @@ public class ReviewOrchestrator {
                     log.debug(summary);
                 })
                 .doOnError(e -> log.error("Error publishing review for {}/{}/PR#{}",
-                        prContext.getOwner(), prContext.getRepo(), prContext.getPrNumber(), e));
+                        prContext.getOwner(), prContext.getRepo(), prContext.getPrNumber(), e))
+                .then(Mono.defer(() ->
+                        persistAndAlert(prContext, rankedFindings, triageResult, summary)));
+    }
+
+    /**
+     * Persist the completed analysis (findings + tier) for later reporting and dedupe,
+     * then fire an immediate alert if the PR is urgent (RED tier / security flag).
+     */
+    private Mono<Void> persistAndAlert(PullRequestContext prContext, List<Finding> findings,
+                                        TriageResult triageResult, String summary) {
+        PrAnalysis saved = persistAnalysis(prContext, findings, triageResult, summary);
+        if (saved != null) {
+            try {
+                thresholdAlertService.maybeAlert(saved);
+            } catch (Exception e) {
+                log.error("Failed to send threshold alert for {}/{}/PR#{}",
+                        prContext.getOwner(), prContext.getRepo(), prContext.getPrNumber(), e);
+            }
+        }
+        return Mono.empty();
+    }
+
+    /**
+     * Persist the completed analysis (findings + tier) for later reporting and dedupe.
+     * Returns the saved entity, or null if persistence failed.
+     */
+    private PrAnalysis persistAnalysis(PullRequestContext prContext, List<Finding> findings,
+                                        TriageResult triageResult, String summary) {
+        try {
+            PrAnalysis entity = new PrAnalysis();
+            entity.setOwner(prContext.getOwner());
+            entity.setRepo(prContext.getRepo());
+            entity.setPrNumber(prContext.getPrNumber());
+            entity.setCommitSha(prContext.getCommitSha());
+            entity.setTier(triageResult != null && triageResult.tier() != null
+                    ? triageResult.tier().name() : "UNKNOWN");
+            entity.setSecurityFlag(triageResult != null && triageResult.securityFlag());
+            entity.setSummary(summary);
+            entity.setFindingsJson(gson.toJson(findings));
+            entity.setStatus("COMPLETED");
+            entity.setInstallationId(String.valueOf(prContext.getInstallationId()));
+            entity.setCreatedAt(java.time.Instant.now());
+
+            prAnalysisRepository.save(entity);
+            log.info("Persisted analysis for {}/{}/PR#{} (sha {})",
+                    prContext.getOwner(), prContext.getRepo(), prContext.getPrNumber(),
+                    prContext.getCommitSha());
+            return entity;
+        } catch (Exception e) {
+            log.error("Failed to persist analysis for {}/{}/PR#{}",
+                    prContext.getOwner(), prContext.getRepo(), prContext.getPrNumber(), e);
+            return null;
+        }
     }
 }
