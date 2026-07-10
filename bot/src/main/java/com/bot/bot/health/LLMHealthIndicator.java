@@ -1,6 +1,7 @@
 package com.bot.bot.health;
 
 import com.bot.bot.config.LLMProperties;
+import com.bot.bot.config.ProviderConfig;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.health.contributor.Health;
@@ -9,13 +10,11 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.reactive.function.client.WebClient;
 
 import java.time.Duration;
+import java.util.List;
 
 /**
- * Probes the configured LLM provider to verify it is reachable and responsive.
- * <ul>
- *   <li>Ollama: {@code GET /api/tags} → returns list of installed models</li>
- *   <li>NVIDIA NIM: {@code GET /v1/models} → returns available models</li>
- * </ul>
+ * Probes the first configured LLM provider to verify it is reachable and responsive.
+ * Uses the OpenAI-compatible {@code GET /v1/models} endpoint for all providers.
  */
 @Slf4j
 @Component
@@ -31,18 +30,25 @@ public class LLMHealthIndicator implements HealthIndicator {
     public Health health() {
         if (!llmProperties.isEnabled()) {
             return Health.up()
-                    .withDetail("provider", llmProperties.getProvider())
                     .withDetail("status", "LLM disabled by configuration")
                     .build();
         }
 
+        List<ProviderConfig> providers = llmProperties.getProviders();
+        if (providers == null || providers.isEmpty()) {
+            return Health.down()
+                    .withDetail("status", "No LLM providers configured")
+                    .build();
+        }
+
+        ProviderConfig primary = providers.get(0);
         try {
-            String url = buildHealthUrl();
+            String url = primary.getBaseUrl().replaceAll("/+$", "") + "/v1/models";
             webClient.get()
                     .uri(url)
                     .headers(headers -> {
-                        if (llmProperties.getApiKey() != null && !llmProperties.getApiKey().isEmpty()) {
-                            headers.setBearerAuth(llmProperties.getApiKey());
+                        if (primary.getApiKey() != null && !primary.getApiKey().isEmpty()) {
+                            headers.setBearerAuth(primary.getApiKey());
                         }
                     })
                     .retrieve()
@@ -51,28 +57,19 @@ public class LLMHealthIndicator implements HealthIndicator {
                     .block();
 
             return Health.up()
-                    .withDetail("provider", llmProperties.getProvider())
-                    .withDetail("baseUrl", llmProperties.getBaseUrl())
+                    .withDetail("provider", primary.getName())
+                    .withDetail("baseUrl", primary.getBaseUrl())
                     .withDetail("status", "reachable")
                     .build();
 
         } catch (Exception e) {
             log.warn("LLM health check failed for {} at {}: {}",
-                    llmProperties.getProvider(), llmProperties.getBaseUrl(), e.getMessage());
+                    primary.getName(), primary.getBaseUrl(), e.getMessage());
             return Health.down()
-                    .withDetail("provider", llmProperties.getProvider())
-                    .withDetail("baseUrl", llmProperties.getBaseUrl())
+                    .withDetail("provider", primary.getName())
+                    .withDetail("baseUrl", primary.getBaseUrl())
                     .withDetail("error", e.getClass().getSimpleName() + ": " + e.getMessage())
                     .build();
         }
-    }
-
-    private String buildHealthUrl() {
-        String base = llmProperties.getBaseUrl().replaceAll("/+$", "");
-        return switch (llmProperties.getProvider()) {
-            case "ollama" -> base + "/api/tags";
-            case "nvidia-nim" -> base + "/v1/models";
-            default -> base + "/health";
-        };
     }
 }
