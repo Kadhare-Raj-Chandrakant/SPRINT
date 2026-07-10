@@ -13,9 +13,15 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.publisher.Mono;
 
+import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.Base64;
 import java.util.List;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 
 /**
  * Client for the GitHub REST API.
@@ -41,6 +47,12 @@ public class GitHubApiClient {
     private volatile Instant tokenExpiry = Instant.EPOCH;
     private volatile long cachedInstallationId;
     private static final Duration TOKEN_CACHE_TTL = Duration.ofMinutes(55);
+
+    private static final long MAX_FILE_BYTES = 64 * 1024;
+
+    // Matches "closes #12", "fixes #7", "resolved #3" (case-insensitive).
+    private static final Pattern CLOSING_ISSUE =
+            Pattern.compile("(?:close[sd]?|fix(?:e[sd])?|resolve[sd]?)\\s+#(\\d+)", Pattern.CASE_INSENSITIVE);
 
     /**
      * Parse PR metadata from webhook payload (no API calls).
@@ -161,6 +173,104 @@ public class GitHubApiClient {
     }
 
     /**
+     * Fetch a repo file (README/CONTRIBUTING) for LLM context (SRS §4).
+     * Files larger than {@link #MAX_FILE_BYTES} are skipped.
+     */
+    public Mono<String> fetchFile(String owner, String repo, String path, long installationId) {
+        String url = String.format("%s/repos/%s/%s/contents/%s",
+                gitHubProperties.getApiUrl(), owner, repo, path);
+
+        return getInstallationToken(installationId)
+                .flatMap(token -> webClient.get()
+                        .uri(url)
+                        .header("Authorization", "Bearer " + token)
+                        .header("Accept", "application/vnd.github.v3+json")
+                        .retrieve()
+                        .bodyToMono(String.class))
+                .map(response -> {
+                    JsonObject json = gson.fromJson(response, JsonObject.class);
+                    if (json == null || !json.has("content")) return "";
+                    long size = json.has("size") ? json.get("size").getAsLong() : -1;
+                    if (size > MAX_FILE_BYTES) {
+                        log.warn("Skipping large file {} ({} bytes)", path, size);
+                        return "";
+                    }
+                    String encoding = json.has("encoding") ? json.get("encoding").getAsString() : "base64";
+                    String content = json.get("content").getAsString();
+                    if (!"base64".equals(encoding)) return content;
+                    try {
+                        return new String(Base64.getDecoder().decode(content.replace("\n", "")),
+                                StandardCharsets.UTF_8);
+                    } catch (Exception e) {
+                        log.warn("Failed to decode file {} content", path, e);
+                        return "";
+                    }
+                })
+                .retryWhen(WebClientConfig.buildRetrySpec("fetch-file"))
+                .onErrorReturn("");
+    }
+
+    /**
+     * Collect text of issues referenced by a PR body (closes/fixes/resolves #N)
+     * for LLM enrichment (SRS §4). Returns concatenated issue bodies, or empty.
+     */
+    public Mono<String> fetchLinkedIssues(String owner, String repo, int prNumber, long installationId) {
+        String prUrl = String.format("%s/repos/%s/%s/pulls/%d",
+                gitHubProperties.getApiUrl(), owner, repo, prNumber);
+
+        return getInstallationToken(installationId)
+                .flatMap(token -> webClient.get()
+                        .uri(prUrl)
+                        .header("Authorization", "Bearer " + token)
+                        .header("Accept", "application/vnd.github.v3+json")
+                        .retrieve()
+                        .bodyToMono(String.class))
+                .flatMap(prBody -> {
+                    JsonObject pr = gson.fromJson(prBody, JsonObject.class);
+                    String body = pr != null && pr.has("body") && !pr.get("body").isJsonNull()
+                            ? pr.get("body").getAsString() : "";
+                    List<Integer> issueNumbers = new ArrayList<>();
+                    Matcher m = CLOSING_ISSUE.matcher(body);
+                    while (m.find()) {
+                        issueNumbers.add(Integer.parseInt(m.group(1)));
+                    }
+                    if (issueNumbers.isEmpty()) {
+                        return Mono.just("");
+                    }
+                    List<Mono<String>> fetches = issueNumbers.stream()
+                            .map(n -> fetchIssueBody(owner, repo, n, installationId))
+                            .collect(Collectors.toList());
+                    return Mono.zip(fetches, results -> {
+                        StringBuilder sb = new StringBuilder();
+                        for (Object r : results) {
+                            sb.append((String) r).append("\n");
+                        }
+                        return sb.toString().trim();
+                    });
+                })
+                .retryWhen(WebClientConfig.buildRetrySpec("fetch-linked-issues"))
+                .onErrorReturn("");
+    }
+
+    private Mono<String> fetchIssueBody(String owner, String repo, int issueNumber, long installationId) {
+        String url = String.format("%s/repos/%s/%s/issues/%d",
+                gitHubProperties.getApiUrl(), owner, repo, issueNumber);
+        return getInstallationToken(installationId)
+                .flatMap(token -> webClient.get()
+                        .uri(url)
+                        .header("Authorization", "Bearer " + token)
+                        .header("Accept", "application/vnd.github.v3+json")
+                        .retrieve()
+                        .bodyToMono(String.class))
+                .map(response -> {
+                    JsonObject json = gson.fromJson(response, JsonObject.class);
+                    return (json != null && json.has("body") && !json.get("body").isJsonNull())
+                            ? json.get("body").getAsString() : "";
+                })
+                .onErrorReturn("");
+    }
+
+    /**
      * Post a PR review with summary body and optional inline comments.
      */
     public Mono<Void> submitReview(String owner, String repo, int prNumber,
@@ -207,6 +317,30 @@ public class GitHubApiClient {
     }
 
     /**
+     * Close a pull request (state=closed). Does NOT merge.
+     */
+    public Mono<Void> closePullRequest(String owner, String repo, int prNumber, long installationId) {
+        String url = String.format("%s/repos/%s/%s/pulls/%d",
+                gitHubProperties.getApiUrl(), owner, repo, prNumber);
+
+        JsonObject body = new JsonObject();
+        body.addProperty("state", "closed");
+
+        return getInstallationToken(installationId)
+                .flatMap(token -> webClient.patch()
+                        .uri(url)
+                        .header("Authorization", "Bearer " + token)
+                        .header("Accept", "application/vnd.github.v3+json")
+                        .bodyValue(body.toString())
+                        .retrieve()
+                        .toBodilessEntity()
+                        .then())
+                .retryWhen(WebClientConfig.buildRetrySpec("close-pr"))
+                .doOnError(e -> log.error("Error closing PR {}/{}/PR#{} after retries",
+                        owner, repo, prNumber, e));
+    }
+
+    /**
      * Post a regular issue comment on a PR.
      */
     public Mono<Void> postComment(String owner, String repo, int prNumber, String body, long installationId) {
@@ -227,6 +361,32 @@ public class GitHubApiClient {
                         .then())
                 .retryWhen(WebClientConfig.buildRetrySpec("post-comment"))
                 .doOnError(e -> log.error("Error posting comment for {}/{}/PR#{} after retries",
+                        owner, repo, prNumber, e));
+    }
+
+    /**
+     * Add labels to a PR (issues API).
+     */
+    public Mono<Void> addLabels(String owner, String repo, int prNumber, List<String> labels, long installationId) {
+        String url = String.format("%s/repos/%s/%s/issues/%d/labels",
+                gitHubProperties.getApiUrl(), owner, repo, prNumber);
+
+        JsonArray labelArray = new JsonArray();
+        for (String label : labels) {
+            labelArray.add(label);
+        }
+
+        return getInstallationToken(installationId)
+                .flatMap(token -> webClient.post()
+                        .uri(url)
+                        .header("Authorization", "Bearer " + token)
+                        .header("Accept", "application/vnd.github.v3+json")
+                        .bodyValue(labelArray.toString())
+                        .retrieve()
+                        .toBodilessEntity()
+                        .then())
+                .retryWhen(WebClientConfig.buildRetrySpec("add-labels"))
+                .doOnError(e -> log.error("Error adding labels for {}/{}/PR#{} after retries",
                         owner, repo, prNumber, e));
     }
 }
