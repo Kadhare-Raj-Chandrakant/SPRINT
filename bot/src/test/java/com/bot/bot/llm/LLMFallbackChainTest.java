@@ -2,8 +2,10 @@ package com.bot.bot.llm;
 
 import com.bot.bot.config.LLMProperties;
 import com.bot.bot.config.ProviderConfig;
+import com.google.gson.Gson;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.publisher.Mono;
 import reactor.test.StepVerifier;
 
@@ -57,7 +59,7 @@ class LLMFallbackChainTest {
         pc.setModel("stub-model");
         props1.setProviders(List.of(pc));
 
-        LLMFallbackChain chain = new LLMFallbackChain(props1);
+        LLMFallbackChain chain = new LLMFallbackChain(props1, WebClient.builder().build(), new Gson());
         chain.afterPropertiesSet();
         // replace delegates with stubs
         chain.delegates.clear();
@@ -76,7 +78,7 @@ class LLMFallbackChainTest {
         ProviderConfig pc3 = new ProviderConfig(); pc3.setName("p3"); pc3.setBaseUrl("http://stub.local"); pc3.setApiKey(""); pc3.setModel("stub-model");
         props1.setProviders(List.of(pc1, pc2, pc3));
 
-        LLMFallbackChain chain = new LLMFallbackChain(props1);
+        LLMFallbackChain chain = new LLMFallbackChain(props1, WebClient.builder().build(), new Gson());
         chain.afterPropertiesSet();
         chain.delegates.clear();
         chain.delegates.add(stubFailure());
@@ -94,7 +96,7 @@ class LLMFallbackChainTest {
         ProviderConfig pc2 = new ProviderConfig(); pc2.setName("p2"); pc2.setBaseUrl("http://stub.local"); pc2.setApiKey(""); pc2.setModel("stub-model");
         props1.setProviders(List.of(pc1, pc2));
 
-        LLMFallbackChain chain = new LLMFallbackChain(props1);
+        LLMFallbackChain chain = new LLMFallbackChain(props1, WebClient.builder().build(), new Gson());
         chain.afterPropertiesSet();
         chain.delegates.clear();
         chain.delegates.add(stubFailure());
@@ -111,7 +113,7 @@ class LLMFallbackChainTest {
     @Test
     void emptyDelegates_throwsIllegalStateException() {
         props1.setProviders(List.of());
-        LLMFallbackChain chain = new LLMFallbackChain(props1);
+        LLMFallbackChain chain = new LLMFallbackChain(props1, WebClient.builder().build(), new Gson());
         chain.afterPropertiesSet();
 
         StepVerifier.create(chain.generateCodeReview("test"))

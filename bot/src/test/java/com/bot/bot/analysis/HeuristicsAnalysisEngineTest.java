@@ -11,6 +11,8 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.Collections;
 import java.util.List;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.Mockito.when;
@@ -65,7 +67,8 @@ class HeuristicsAnalysisEngineTest {
 
         HeuristicsAnalysisEngine engine = new HeuristicsAnalysisEngine(
                 secretsDetectionRule, commitMessageStyleRule, diffShapeRule,
-                accountAgeRule, commentCodeRatioRule, boilerplatePhraseRule);
+                accountAgeRule, commentCodeRatioRule, boilerplatePhraseRule,
+                Executors.newFixedThreadPool(6));
 
         PullRequestContext prContext = PullRequestContext.builder()
                 .owner("owner").repo("repo").prNumber(1)

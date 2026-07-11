@@ -2,8 +2,10 @@ package com.bot.bot.llm;
 
 import com.bot.bot.config.LLMProperties;
 import com.bot.bot.config.ProviderConfig;
+import com.google.gson.Gson;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.InitializingBean;
+import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.publisher.Mono;
 
 import java.util.ArrayList;
@@ -17,10 +19,14 @@ import java.util.List;
 public class LLMFallbackChain implements LLMClient, InitializingBean {
 
     private final LLMProperties llmProperties;
+    private final WebClient webClient;
+    private final Gson gson;
     final List<OpenAiCompatibleClient> delegates = new ArrayList<>();
 
-    public LLMFallbackChain(LLMProperties llmProperties) {
+    public LLMFallbackChain(LLMProperties llmProperties, WebClient webClient, Gson gson) {
         this.llmProperties = llmProperties;
+        this.webClient = webClient;
+        this.gson = gson;
     }
 
     @Override
@@ -55,7 +61,10 @@ public class LLMFallbackChain implements LLMClient, InitializingBean {
         return new OpenAiCompatibleClient(
                 config.getBaseUrl(),
                 config.getApiKey(),
-                config.getModel()
+                config.getModel(),
+                llmProperties.getTimeoutSeconds(),
+                webClient,
+                gson
         );
     }
 

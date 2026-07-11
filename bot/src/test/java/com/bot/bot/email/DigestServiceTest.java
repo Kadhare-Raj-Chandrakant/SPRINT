@@ -64,10 +64,17 @@ class DigestServiceTest {
                 "", "0 0 18 * * *", "RED", true, emailEnabled, true, List.of("dev@example.com")));
     }
 
+    private Meta markerAt(Instant t) {
+        Meta m = new Meta();
+        m.setKey("lastDigestAt");
+        m.setValue(t.toString());
+        return m;
+    }
+
     @Test
     void sendsDigestForNewAnalysesAndAdvancesMarker() {
         stubConfig(true);
-        when(metaRepository.findById("lastDigestAt")).thenReturn(Optional.empty());
+        when(metaRepository.findById("lastDigestAt")).thenReturn(Optional.of(markerAt(Instant.parse("2024-01-15T12:00:00Z"))));
         when(emailTemplate.renderDigest(anyList())).thenReturn("<table>body</table>");
         List<PrAnalysis> three = List.of(
                 analysis("o", "r", 1, "GREEN"),
@@ -87,7 +94,7 @@ class DigestServiceTest {
 
     @Test
     void noEmailWhenNoNewAnalyses() {
-        when(metaRepository.findById("lastDigestAt")).thenReturn(Optional.empty());
+        when(metaRepository.findById("lastDigestAt")).thenReturn(Optional.of(markerAt(Instant.parse("2024-01-15T12:00:00Z"))));
         when(prAnalysisRepository.findByCreatedAtAfter(any(Instant.class))).thenReturn(List.of());
 
         digestService.sendDailyDigest();
@@ -99,13 +106,23 @@ class DigestServiceTest {
     @Test
     void noEmailWhenInstallationEmailDisabled() {
         stubConfig(false);
-        when(metaRepository.findById("lastDigestAt")).thenReturn(Optional.empty());
+        when(metaRepository.findById("lastDigestAt")).thenReturn(Optional.of(markerAt(Instant.parse("2024-01-15T12:00:00Z"))));
         when(prAnalysisRepository.findByCreatedAtAfter(any(Instant.class)))
                 .thenReturn(List.of(analysis("o", "r", 1, "RED")));
 
         digestService.sendDailyDigest();
 
         verify(mailService, never()).sendEmail(anyList(), anyString(), anyString());
+    }
+
+    @Test
+    void firstRunSeedsMarkerAndSkipsBackfill() {
+        when(metaRepository.findById("lastDigestAt")).thenReturn(Optional.empty());
+
+        digestService.sendDailyDigest();
+
+        verify(mailService, never()).sendEmail(anyList(), anyString(), anyString());
+        verify(metaRepository).save(any(Meta.class));
     }
 
     @Test

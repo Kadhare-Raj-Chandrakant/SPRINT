@@ -4,12 +4,15 @@ import com.bot.bot.config.AppProperties;
 import com.bot.bot.persistence.Meta;
 import com.bot.bot.persistence.MetaRepository;
 
+import org.springframework.scheduling.annotation.Scheduled;
+
 import java.nio.charset.StandardCharsets;
 import java.security.InvalidKeyException;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.time.Instant;
 import java.util.HexFormat;
+import java.util.List;
 
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
@@ -31,7 +34,7 @@ public class TokenService {
     public TokenService(AppProperties props, MetaRepository metaRepository) {
         this.secret = props.getActionSecret();
         this.baseUrl = props.getBaseUrl();
-        this.expirySeconds = 7L * 24 * 60 * 60; // 7 days
+        this.expirySeconds = 30L * 60; // 30 minutes
         this.metaRepository = metaRepository;
     }
 
@@ -86,16 +89,36 @@ public class TokenService {
         if (Instant.now().getEpochSecond() > expiry) {
             throw new TokenException("token expired");
         }
-        metaRepository.save(usedRow(token));
+        metaRepository.save(usedRow(token, expiry));
 
         return new TokenPayload(parts[0], parts[1], Integer.parseInt(parts[2]), parts[3], expiry);
     }
 
-    private Meta usedRow(String token) {
+    private Meta usedRow(String token, long expiryEpoch) {
         Meta m = new Meta();
         m.setKey(USED_PREFIX + sha256Hex(token));
-        m.setValue("1");
+        m.setValue(String.valueOf(expiryEpoch));
         return m;
+    }
+
+    /**
+     * Periodically purge used-token markers whose token has now expired, so the
+     * {@code meta} table does not grow without bound.
+     */
+    @Scheduled(cron = "0 0 * * * *")
+    public void purgeExpiredUsedTokens() {
+        List<Meta> used = metaRepository.findByKeyStartingWith(USED_PREFIX);
+        long now = Instant.now().getEpochSecond();
+        for (Meta m : used) {
+            try {
+                long expiry = Long.parseLong(m.getValue());
+                if (expiry < now) {
+                    metaRepository.delete(m);
+                }
+            } catch (NumberFormatException e) {
+                metaRepository.delete(m);
+            }
+        }
     }
 
     private String hmac(String data) {

@@ -6,6 +6,7 @@ import io.netty.handler.timeout.WriteTimeoutHandler;
 import com.bot.bot.llm.LLMClient;
 import com.bot.bot.llm.LLMFallbackChain;
 import com.bot.bot.llm.OpenAiCompatibleClient;
+import com.google.gson.Gson;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.client.reactive.ReactorClientHttpConnector;
@@ -66,8 +67,8 @@ public class WebClientConfig {
      * Tries providers in configured order; falls back on failure.
      */
     @Bean
-    public LLMClient llmClient(LLMProperties llmProperties) {
-        return new LLMFallbackChain(llmProperties);
+    public LLMClient llmClient(LLMProperties llmProperties, WebClient webClient, Gson gson) {
+        return new LLMFallbackChain(llmProperties, webClient, gson);
     }
 
     // ── HttpClient with connection pool + timeouts ──────────────────

@@ -57,6 +57,14 @@ public class DigestService {
     @Scheduled(cron = "${app.mail.digest-cron:0 0 18 * * *}")
     public void sendDailyDigest() {
         Instant lastDigest = getLastDigestAt();
+
+        // First run: don't backfill the entire history. Seed the marker and return.
+        if (lastDigest.equals(Instant.EPOCH)) {
+            setLastDigestAt(Instant.now(clock));
+            log.info("Digest first run — seeding lastDigestAt, skipping backfill");
+            return;
+        }
+
         Instant now = Instant.now(clock);
         List<PrAnalysis> newAnalyses = prAnalysisRepository.findByCreatedAtAfter(lastDigest);
         if (newAnalyses.isEmpty()) {
@@ -65,18 +73,28 @@ public class DigestService {
         }
         Map<String, List<PrAnalysis>> byInstallation = newAnalyses.stream()
                 .collect(Collectors.groupingBy(a -> a.getInstallationId() == null ? "" : a.getInstallationId()));
+        boolean anySent = false;
         for (Map.Entry<String, List<PrAnalysis>> entry : byInstallation.entrySet()) {
             ConfigService.ResolvedConfig cfg = configService.resolve(entry.getKey());
             if (!cfg.emailEnabled()) {
                 log.debug("Digest skipped for installation {} - email disabled", entry.getKey());
                 continue;
             }
-            String body = emailTemplate.renderDigest(entry.getValue());
-            mailService.sendEmail(cfg.maintainerEmails(),
-                    "PR Triage Digest — " + entry.getValue().size() + " update(s)", body);
-            log.info("Digested {} analysis(es) for installation {}", entry.getValue().size(), entry.getKey());
+            try {
+                String body = emailTemplate.renderDigest(entry.getValue());
+                mailService.sendEmail(cfg.maintainerEmails(),
+                        "PR Triage Digest — " + entry.getValue().size() + " update(s)", body);
+                log.info("Digested {} analysis(es) for installation {}", entry.getValue().size(), entry.getKey());
+                anySent = true;
+            } catch (Exception e) {
+                // Best-effort: a failure for one installation must not skip the rest,
+                // and we don't advance lastDigestAt so it can be retried next run.
+                log.error("Failed to send digest for installation {}", entry.getKey(), e);
+            }
         }
-        setLastDigestAt(now);
+        if (anySent) {
+            setLastDigestAt(now);
+        }
     }
 
     String buildDigestBody(List<PrAnalysis> analyses) {

@@ -58,9 +58,6 @@ public class LLMReviewEngine {
     }
 
     /**
-     * Build a comprehensive prompt for the LLM with context.
-     */
-        /**
      * Build a comprehensive prompt for the LLM with context, including AI-likelihood assessment.
      */
     private String buildPrompt(ChangeChunk chunk, PullRequestContext prContext) {
@@ -130,13 +127,9 @@ public class LLMReviewEngine {
             "\\b(AI-LIKELIHOOD:\\s*HIGH|\\[HIGH\\]|AI-GENERATED|HIGH AI-LIKELIHOOD)\\b.*", Pattern.CASE_INSENSITIVE);
 
     /**
-     * Parse LLM response and extract findings.
-     * Uses word-boundary matching to reduce false positives from natural language.
-     */
-        /**
      * Parse LLM response and extract findings, including AI-likelihood classification.
      */
-        private List<Finding> parseReviewResponse(String response, ChangeChunk chunk) {
+    private List<Finding> parseReviewResponse(String response, ChangeChunk chunk) {
         List<Finding> findings = new ArrayList<>();
 
         if (response == null || response.isEmpty()) {

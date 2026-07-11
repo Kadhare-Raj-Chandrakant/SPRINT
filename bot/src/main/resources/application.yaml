@@ -56,7 +56,7 @@ spring.webflux:
 logging:
   level:
     root: INFO
-    com.bot.bot: DEBUG
+    com.bot.bot: INFO
     # Suppress noisy netty/reactor wire logs
     reactor.netty: WARN
     io.netty: WARN
@@ -96,12 +96,14 @@ github:
 
 # ── LLM Configuration ────────────────────────────────────────────────
 llm:
-  provider: ${LLM_PROVIDER:nvidia-nim}
-  model: ${LLM_MODEL:meta/llama-3.1-8b-instruct}
-  base-url: ${LLM_BASE_URL:http://localhost:8000}
-  timeout-seconds: ${LLM_TIMEOUT_SECONDS:60}
   enabled: ${LLM_ENABLED:true}
-  api-key: ${LLM_API_KEY:}
+  timeout-seconds: ${LLM_TIMEOUT_SECONDS:60}
+  providers:
+    - provider-type: ${LLM_PROVIDER_TYPE:openai-compatible}
+      name: primary
+      base-url: ${LLM_BASE_URL:http://localhost:8000}
+      model: ${LLM_MODEL:meta/llama-3.1-8b-instruct}
+      api-key: ${LLM_API_KEY:}
 
 # ── Application Configuration ────────────────────────────────────────
 app:
