@@ -254,12 +254,6 @@ Recommendation: %s
 
         boolean isCoherent = !noClearIntent && !sweepingUnrelated;
 
-        // RED: critical security findings (secret leakage, credentials, etc.)
-        if (hasSecurityFinding) {
-            return new TriageResult(TriageResult.Tier.RED, true,
-                    TriageResult.SuggestedAction.MANUAL_CHECK);
-        }
-
         // RED: templated + sweeping-unrelated changes + no clear intent
         if (hasTemplatedSignal && sweepingUnrelated && noClearIntent) {
             return new TriageResult(TriageResult.Tier.RED, hasSecurityFinding,
