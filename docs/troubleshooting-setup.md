@@ -290,7 +290,7 @@ MAIL_FROM=you@gmail.com
 MAIL_MAINTAINERS=you@gmail.com,your-team@example.com
 
 # Spring Datasource (PostgreSQL)
-DATABASE_URL=jdbc:postgresql://localhost:5432/pr-triage
+DATABASE_URL=jdbc:postgresql://localhost:5432/pr_triage
 DATABASE_USER=postgres
 DATABASE_PASSWORD=postgres
 
