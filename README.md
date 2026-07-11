@@ -1,4 +1,4 @@
-# PR Triage Bot (`glint`)
+# PR Triage Bot (`SPRINT`)
 
 A webhook-driven GitHub App that automatically triages every incoming pull request:
 it fetches the diff, runs cheap heuristics **and** an LLM review in parallel,
