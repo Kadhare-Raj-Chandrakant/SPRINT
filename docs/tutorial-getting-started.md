@@ -1,6 +1,6 @@
 # Tutorial: Getting Started
 
-This tutorial takes you from zero to a working `glint` PR-triage bot that
+This tutorial takes you from zero to a working `SPRINT` PR-triage bot that
 triages pull requests on a real GitHub repo. It assumes Java 21, Maven, and a
 PostgreSQL database are available.
 
@@ -31,7 +31,7 @@ PostgreSQL database are available.
 ## 2. Prepare the environment
 
 ```bash
-cd pr-triage/bot
+cd SPRINT/bot
 cp .env.example .env
 ```
 
@@ -79,7 +79,7 @@ mv ~/Downloads/your-app.pem bot/certs/github-app.pem
 ## 3. Build and run
 
 ```bash
-cd pr-triage/bot
+cd SPRINT/bot
 mvn -q spring-boot:run
 ```
 

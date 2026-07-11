@@ -8,11 +8,11 @@
         <version>4.0.2</version>
         <relativePath/> <!-- lookup parent from repository -->
     </parent>
-    <groupId>com.bot</groupId>
-    <artifactId>bot</artifactId>
+    <groupId>com.sprint</groupId>
+    <artifactId>sprint</artifactId>
     <version>0.0.1-SNAPSHOT</version>
-    <name>bot</name>
-    <description>bot</description>
+    <name>SPRINT</name>
+    <description>Smart Pull Request Intelligence - PR triage bot with heuristics and LLM review</description>
     <url/>
     <licenses>
         <license/>

@@ -1,6 +1,6 @@
 # Architecture
 
-This document describes how the PR Triage Bot (`glint`) is structured and how a
+This document describes how the PR Triage Bot (`SPRINT`) is structured and how a
 pull request flows through it. It is the companion to the
 [API reference](docs/reference-api.md) and the
 [analysis pipeline explanation](docs/explanation-analysis-pipeline.md).

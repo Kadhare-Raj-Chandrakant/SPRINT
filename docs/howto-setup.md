@@ -1,11 +1,11 @@
 # How-to: Setup
 
-Practical recipes for configuring `glint` after the [getting-started tutorial](tutorial-getting-started.md).
+Practical recipes for configuring `SPRINT` after the [getting-started tutorial](tutorial-getting-started.md).
 For the full key reference, see [Reference: configuration](reference-configuration.md).
 
 ## GitHub App
 
-`glint` authenticates as a GitHub App (not a user token). It generates a JWT
+`SPRINT` authenticates as a GitHub App (not a user token). It generates a JWT
 from the private key, exchanges it for a short-lived installation token
 (cached ~55 min), and calls the REST API.
 
@@ -24,7 +24,7 @@ permissions (set in the GitHub App console — see the tutorial).
 
 ## LLM providers
 
-`glint` reviews diff chunks with an LLM. Providers are a **list**; the
+`SPRINT` reviews diff chunks with an LLM. Providers are a **list**; the
 `LLMFallbackChain` tries them in order until one succeeds.
 
 Configure in `bot/src/main/resources/application.yaml` under `llm.providers`:
@@ -60,7 +60,7 @@ Toggle LLM entirely with `app.llm-enabled: false` (env `LLM_ENABLED`).
 
 ## Email
 
-Email is optional. When enabled, `glint` sends:
+Email is optional. When enabled, `SPRINT` sends:
 
 - a **daily digest** of new PRs per installation (cron, default `0 0 18 * * *`),
 - an **immediate alert** for RED-tier or security-flagged PRs.
@@ -76,7 +76,7 @@ Email is optional. When enabled, `glint` sends:
 
 ## One-click actions
 
-`glint` posts `Approve / Request changes / Close` buttons on each PR. These hit
+`SPRINT` posts `Approve / Request changes / Close` buttons on each PR. These hit
 `/action?token=…&do=…` where the token is an HMAC-signed, single-use value
 (`TokenService`). The bot **never auto-merges**; `close` sets `state=closed`
 only.

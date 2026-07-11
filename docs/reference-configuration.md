@@ -1,6 +1,6 @@
 # Reference: Configuration
 
-Every configuration key `glint` reads, grouped by source. Env vars take
+Every configuration key `SPRINT` reads, grouped by source. Env vars take
 precedence over `application.yaml`. See [how-to: setup](howto-setup.md) for
 recipes.
 

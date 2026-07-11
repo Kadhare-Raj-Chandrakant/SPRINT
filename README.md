@@ -1,4 +1,4 @@
-# PR Triage Bot (`SPRINT`)
+# SPRINT (Smart Pull Request Intelligence)
 
 A webhook-driven GitHub App that automatically triages every incoming pull request:
 it fetches the diff, runs cheap heuristics **and** an LLM review in parallel,
@@ -11,7 +11,7 @@ maintainer can triage a flood of PRs in minutes instead of hours.
 > deliberate signed-action click.
 
 - **Stack:** Spring Boot 4.0.2 (Java 21), Maven, PostgreSQL, WebFlux `WebClient`, Thymeleaf dashboard.
-- **App name:** `glint` (see `spring.application.name` in `bot/src/main/resources/application.yaml`).
+- **App name:** `sprint` (see `spring.application.name` in `bot/src/main/resources/application.yaml`).
 - **Design intent:** see [`docs/SRS.md`](docs/SRS.md) (Solution Requirements Spec).
 
 ## Features
@@ -19,8 +19,8 @@ maintainer can triage a flood of PRs in minutes instead of hours.
 - Verifies GitHub webhook signatures (HMAC `X-Hub-Signature-256`) on every request.
 - Reacts to `pull_request` events: `opened`, `synchronize`, `reopened`.
 - Dual signal engine:
-  - **Heuristics** (`com.bot.bot.analysis.heuristics.*`) — secrets, commit-message style, diff shape, account age, comment/code ratio, boilerplate phrases. Runs synchronously, in parallel.
-  - **LLM review** (`com.bot.bot.analysis.LLMReviewEngine`) — per-diff-chunk review via an OpenAI-compatible endpoint, with an ordered provider fallback chain.
+  - **Heuristics** (`com.sprint.sprint.analysis.heuristics.*`) — secrets, commit-message style, diff shape, account age, comment/code ratio, boilerplate phrases. Runs synchronously, in parallel.
+  - **LLM review** (`com.sprint.sprint.analysis.LLMReviewEngine`) — per-diff-chunk review via an OpenAI-compatible endpoint, with an ordered provider fallback chain.
 - Per-installation **triage tier**: 🟢 GREEN / 🟡 YELLOW / 🔴 RED, plus a separate `security` flag.
 - Posts a markdown review with a severity breakdown and optional inline comments.
 - Applies `triage:green|yellow|red` (+ `security`) labels.
@@ -40,10 +40,10 @@ maintainer can triage a flood of PRs in minutes instead of hours.
 ## Repository layout
 
 ```
-pr-triage/
+SPRINT/
 ├── bot/                      # Spring Boot application (the bot)
-│   ├── src/main/java/com/bot/bot/
-│   │   ├── BotApplication.java        # entry point, .env loader
+│   ├── src/main/java/com/sprint/sprint/
+│   │   ├── SprintApplication.java        # entry point, .env loader
 │   │   ├── webhook/                   # GitHubWebhookController, WebhookSignatureVerifier
 │   │   ├── service/                   # ReviewOrchestrator (pipeline)
 │   │   ├── analysis/                  # heuristics + LLMReviewEngine + SummaryGenerator

@@ -3,7 +3,7 @@
 Real issues hit during first deployment. If something doesn't work, check here
 before diving into the source.
 
-> **Audience:** Anyone setting up `glint` for the first time, especially behind
+> **Audience:** Anyone setting up `SPRINT` for the first time, especially behind
 > ngrok or with Gmail.
 > **Prerequisites:** [tutorial-getting-started.md](tutorial-getting-started.md),
 > [howto-setup.md](howto-setup.md).
@@ -250,15 +250,15 @@ See commit `469ce4d`.
 
 ---
 
-## 8. Application name: "bot" vs "glint"
+## 8. Application name: "bot" vs "SPRINT"
 
-The Maven artifact is `bot` (`pom.xml` → `<artifactId>bot</artifactId>`), but
-the `spring.application.name` in `application.yaml` is `glint`. This is
-intentional — `glint` is the project code name, `bot` is the deployment
-artifact. On the filesystem, everything lives under `bot/`.
+The Maven artifact is `sprint` (`pom.xml` → `<artifactId>sprint</artifactId>`), and
+the `spring.application.name` in `application.yaml` is `sprint`. This is
+intentional — `SPRINT` is the project name, and the Spring application name
+(used in logging, metrics, etc.) matches it.
 
-When reading logs, config, or paths: `bot/` is the Maven module,
-`glint` is the Spring application name (used in logging, metrics, etc.).
+When reading logs, config, or paths: `bot/` is the Maven module directory,
+`sprint` is the Spring application name.
 
 ---
 

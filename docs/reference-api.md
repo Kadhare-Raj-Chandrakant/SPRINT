@@ -1,6 +1,6 @@
 # Reference: API & Endpoints
 
-`glint` exposes a small HTTP surface: a GitHub webhook, a liveness health
+`SPRINT` exposes a small HTTP surface: a GitHub webhook, a liveness health
 check, a read-only dashboard, and signed one-click action links. All paths are
 relative to the configured `server.port` (default `8080`).
 
