@@ -91,10 +91,13 @@ github:
   app-id: ${GITHUB_APP_ID:}
   client-id: ${GITHUB_CLIENT_ID:}
   webhook-secret: ${GITHUB_WEBHOOK_SECRET:}
-  private-key-path: ${GITHUB_PRIVATE_KEY_PATH:certs/private-key.pem}
+  private-key-path: ${GITHUB_PRIVATE_KEY_PATH:certs/github-app.pem}
   api-url: ${GITHUB_API_URL:https://api.github.com}
 
 # ── LLM Configuration ────────────────────────────────────────────────
+# The provider list drives the fallback chain (LLMFallbackChain). These env
+# vars seed the FIRST provider; add more under `providers:` for fallback.
+# Supported provider-type: openai-compatible | nvidia-nim | ollama.
 llm:
   enabled: ${LLM_ENABLED:true}
   timeout-seconds: ${LLM_TIMEOUT_SECONDS:60}
