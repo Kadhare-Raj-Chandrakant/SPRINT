@@ -3,10 +3,14 @@ package com.bot.bot.webhook;
 import com.bot.bot.service.ReviewOrchestrator;
 import com.google.gson.Gson;
 import com.google.gson.JsonObject;
+import jakarta.servlet.http.HttpServletRequest;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mockito;
 import org.springframework.http.ResponseEntity;
+
+import java.io.ByteArrayInputStream;
+import java.nio.charset.StandardCharsets;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.ArgumentMatchers.any;
@@ -29,8 +33,22 @@ class GitHubWebhookControllerTest {
         assertEquals("OK", response.getBody());
     }
 
+    private static HttpServletRequest mockRequest(String body) throws Exception {
+        HttpServletRequest req = Mockito.mock(HttpServletRequest.class);
+        when(req.getInputStream()).thenReturn(
+                new jakarta.servlet.ServletInputStream() {
+                    private final ByteArrayInputStream bis = new ByteArrayInputStream(
+                            body.getBytes(StandardCharsets.UTF_8));
+                    @Override public int read() { return bis.read(); }
+                    @Override public boolean isFinished() { return bis.available() == 0; }
+                    @Override public boolean isReady() { return true; }
+                    @Override public void setReadListener(jakarta.servlet.ReadListener l) {}
+                });
+        return req;
+    }
+
     @Test
-    void returnsUnauthorizedWhenSignatureInvalid() {
+    void returnsUnauthorizedWhenSignatureInvalid() throws Exception {
         WebhookSignatureVerifier signatureVerifier = Mockito.mock(WebhookSignatureVerifier.class);
         ReviewOrchestrator reviewOrchestrator = Mockito.mock(ReviewOrchestrator.class);
         Gson gson = new Gson();
@@ -39,7 +57,7 @@ class GitHubWebhookControllerTest {
         when(signatureVerifier.verifySignature(any(), any())).thenReturn(false);
 
         ResponseEntity<String> response = controller.handleGitHubWebhook(
-                "{\"action\":\"opened\"}",
+                mockRequest("{\"action\":\"opened\"}"),
                 "invalid",
                 "pull_request",
                 "delivery-id"
@@ -51,7 +69,7 @@ class GitHubWebhookControllerTest {
     }
 
     @Test
-    void ignoresNonPullRequestEvents() {
+    void ignoresNonPullRequestEvents() throws Exception {
         WebhookSignatureVerifier signatureVerifier = Mockito.mock(WebhookSignatureVerifier.class);
         ReviewOrchestrator reviewOrchestrator = Mockito.mock(ReviewOrchestrator.class);
         Gson gson = new Gson();
@@ -60,7 +78,7 @@ class GitHubWebhookControllerTest {
         when(signatureVerifier.verifySignature(any(), any())).thenReturn(true);
 
         ResponseEntity<String> response = controller.handleGitHubWebhook(
-                "{\"action\":\"opened\"}",
+                mockRequest("{\"action\":\"opened\"}"),
                 "valid",
                 "push",
                 "delivery-id"
@@ -72,7 +90,7 @@ class GitHubWebhookControllerTest {
     }
 
     @Test
-    void processesPullRequestForSupportedActions() {
+    void processesPullRequestForSupportedActions() throws Exception {
         WebhookSignatureVerifier signatureVerifier = Mockito.mock(WebhookSignatureVerifier.class);
         ReviewOrchestrator reviewOrchestrator = Mockito.mock(ReviewOrchestrator.class);
         Gson gson = new Gson();
@@ -83,7 +101,7 @@ class GitHubWebhookControllerTest {
         String payload = "{\"action\":\"opened\"}";
 
         ResponseEntity<String> response = controller.handleGitHubWebhook(
-                payload,
+                mockRequest(payload),
                 "valid",
                 "pull_request",
                 "delivery-id"
@@ -99,7 +117,7 @@ class GitHubWebhookControllerTest {
     }
 
     @Test
-    void ignoresUnsupportedPullRequestActions() {
+    void ignoresUnsupportedPullRequestActions() throws Exception {
         WebhookSignatureVerifier signatureVerifier = Mockito.mock(WebhookSignatureVerifier.class);
         ReviewOrchestrator reviewOrchestrator = Mockito.mock(ReviewOrchestrator.class);
         Gson gson = new Gson();
@@ -108,7 +126,7 @@ class GitHubWebhookControllerTest {
         when(signatureVerifier.verifySignature(any(), any())).thenReturn(true);
 
         ResponseEntity<String> response = controller.handleGitHubWebhook(
-                "{\"action\":\"closed\"}",
+                mockRequest("{\"action\":\"closed\"}"),
                 "valid",
                 "pull_request",
                 "delivery-id"

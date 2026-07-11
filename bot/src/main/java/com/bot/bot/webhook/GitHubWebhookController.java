@@ -3,12 +3,15 @@ package com.bot.bot.webhook;
 import com.google.gson.Gson;
 import com.google.gson.JsonObject;
 import com.bot.bot.service.ReviewOrchestrator;
+import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.slf4j.MDC;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+
+import java.io.IOException;
 
 /**
  * Webhook controller for GitHub App events.
@@ -31,10 +34,10 @@ public class GitHubWebhookController {
 
     @PostMapping("/github")
     public ResponseEntity<String> handleGitHubWebhook(
-            @RequestBody String payload,
+            HttpServletRequest request,
             @RequestHeader(value = "X-Hub-Signature-256", required = false) String signature,
             @RequestHeader("X-GitHub-Event") String eventType,
-            @RequestHeader("X-GitHub-Delivery") String deliveryId) {
+            @RequestHeader("X-GitHub-Delivery") String deliveryId) throws IOException {
 
         // Inject trace ID into MDC for the duration of this request
         MDC.put("traceId", deliveryId);
@@ -42,10 +45,16 @@ public class GitHubWebhookController {
         try {
             log.info("Received event: {} (delivery: {})", eventType, deliveryId);
 
+            // ── Read raw body bytes ─────────────────────────────
+            // Read directly from the input stream to avoid Spring's message converters
+            // consuming the body before signature verification (Gson/Jackson may drain
+            // the stream trying to deserialize a JSON object into a String).
+            byte[] rawBytes = request.getInputStream().readAllBytes();
+            String payload = new String(rawBytes, java.nio.charset.StandardCharsets.UTF_8);
+
             // ── Payload size validation ─────────────────────────
-            long payloadBytes = payload != null ? payload.getBytes(java.nio.charset.StandardCharsets.UTF_8).length : 0;
-            if (payloadBytes > MAX_PAYLOAD_BYTES) {
-                log.warn("Payload too large: {} bytes (max: {})", payloadBytes, MAX_PAYLOAD_BYTES);
+            if (rawBytes.length > MAX_PAYLOAD_BYTES) {
+                log.warn("Payload too large: {} bytes (max: {})", rawBytes.length, MAX_PAYLOAD_BYTES);
                 return ResponseEntity.status(HttpStatus.PAYLOAD_TOO_LARGE)
                         .body("Payload exceeds maximum size of " + MAX_PAYLOAD_BYTES + " bytes");
             }
@@ -59,7 +68,7 @@ public class GitHubWebhookController {
             // ── Only process pull request events ────────────────
             if (!"pull_request".equals(eventType)) {
                 log.debug("Ignoring non-PR event: {}", eventType);
-                return ResponseEntity.ok("Event ignored");
+                return ResponseEntity.ok("pong");
             }
 
             try {
