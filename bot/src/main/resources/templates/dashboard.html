@@ -3,44 +3,486 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width,initial-scale=1">
-    <title>PR Triage Dashboard</title>
+    <title>glint · PR Triage</title>
     <style>
-        body { font-family: system-ui, sans-serif; margin: 0; background: #f6f8fa; color: #1f2328; }
-        h1 { padding: 1rem 1.5rem; margin: 0; background: #24292f; color: #fff; font-size: 1.1rem; }
-        table { width: 100%; border-collapse: collapse; background: #fff; }
-        th, td { padding: .6rem .8rem; text-align: left; border-bottom: 1px solid #eaecef; vertical-align: top; }
-        th { background: #f6f8fa; font-size: .8rem; text-transform: uppercase; letter-spacing: .03em; }
-        .btn { display: inline-block; padding: .25rem .6rem; margin-right: .3rem; border-radius: 6px;
-               background: #1f883d; color: #fff; text-decoration: none; font-size: .8rem; }
-        .btn.danger { background: #cf222e; }
-        .done { color: #1a7f37; font-weight: 600; }
-        .empty { text-align: center; color: #656d76; padding: 2rem; }
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+        :root {
+            --indigo:   #4f46e5;
+            --indigo-bg: #eef2ff;
+            --slate-50:  #f8fafc;
+            --slate-100: #f1f5f9;
+            --slate-200: #e2e8f0;
+            --slate-300: #cbd5e1;
+            --slate-400: #94a3b8;
+            --slate-500: #64748b;
+            --slate-600: #475569;
+            --slate-700: #334155;
+            --slate-800: #1e293b;
+            --slate-900: #0f172a;
+            --red:     #dc2626;
+            --red-bg:  #fef2f2;
+            --yellow:  #d97706;
+            --yellow-bg:#fffbeb;
+            --green:   #16a34a;
+            --green-bg: #f0fdf4;
+            --accent:  #e94560;
+            --accent-dim: #b91c3a;
+            --radius:  8px;
+            --radius-lg: 12px;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue',
+                         Arial, sans-serif;
+            background: var(--slate-100);
+            color: var(--slate-800);
+            min-height: 100vh;
+        }
+
+        /* ── header ── */
+        header {
+            background: linear-gradient(135deg, #0f172a 0%, #1e293b 60%, #334155 100%);
+            color: #fff;
+            padding: 0 2rem;
+            height: 56px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            box-shadow: 0 1px 3px rgba(0,0,0,.2);
+            position: sticky;
+            top: 0;
+            z-index: 50;
+        }
+        header .brand {
+            display: flex;
+            align-items: center;
+            gap: .6rem;
+        }
+        header .brand .mark {
+            width: 28px;
+            height: 28px;
+            border-radius: 6px;
+            background: linear-gradient(135deg, var(--accent), var(--accent-dim));
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: .85rem;
+            font-weight: 700;
+            color: #fff;
+            flex-shrink: 0;
+        }
+        header .brand h1 {
+            font-size: 1.1rem;
+            font-weight: 600;
+            letter-spacing: -.01em;
+        }
+        header .brand h1 span {
+            color: var(--accent);
+        }
+        header .meta {
+            display: flex;
+            align-items: center;
+            gap: .75rem;
+        }
+        header .pill {
+            font-size: .7rem;
+            font-weight: 500;
+            text-transform: uppercase;
+            letter-spacing: .05em;
+            padding: .25rem .65rem;
+            border-radius: 20px;
+            background: rgba(255,255,255,.08);
+            color: var(--slate-300);
+            border: 1px solid rgba(255,255,255,.06);
+        }
+
+        /* ── page ── */
+        .page {
+            max-width: 1120px;
+            margin: 0 auto;
+            padding: 1.75rem 1.5rem;
+        }
+
+        /* ── stats bar ── */
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 1rem;
+            margin-bottom: 1.75rem;
+        }
+        .stat-card {
+            background: #fff;
+            border-radius: var(--radius-lg);
+            padding: 1rem 1.25rem;
+            display: flex;
+            align-items: center;
+            gap: .9rem;
+            box-shadow: 0 1px 3px rgba(0,0,0,.05);
+            border: 1px solid var(--slate-200);
+            transition: box-shadow .15s, transform .1s;
+        }
+        .stat-card:hover {
+            box-shadow: 0 4px 12px rgba(0,0,0,.08);
+            transform: translateY(-1px);
+        }
+        .stat-card .stat-icon {
+            width: 40px;
+            height: 40px;
+            border-radius: var(--radius);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.1rem;
+            flex-shrink: 0;
+        }
+        .stat-card.red .stat-icon    { background: var(--red-bg); }
+        .stat-card.yellow .stat-icon { background: var(--yellow-bg); }
+        .stat-card.green .stat-icon  { background: var(--green-bg); }
+        .stat-card.total .stat-icon  { background: var(--indigo-bg); }
+        .stat-card .stat-body { display: flex; flex-direction: column; gap: .1rem; }
+        .stat-card .stat-value {
+            font-size: 1.4rem;
+            font-weight: 700;
+            line-height: 1.2;
+        }
+        .stat-card.red .stat-value    { color: var(--red); }
+        .stat-card.yellow .stat-value { color: var(--yellow); }
+        .stat-card.green .stat-value  { color: var(--green); }
+        .stat-card.total .stat-value  { color: var(--indigo); }
+        .stat-card .stat-label {
+            font-size: .72rem;
+            font-weight: 500;
+            color: var(--slate-500);
+            text-transform: uppercase;
+            letter-spacing: .04em;
+        }
+
+        /* ── table card ── */
+        .table-card {
+            background: #fff;
+            border-radius: var(--radius-lg);
+            border: 1px solid var(--slate-200);
+            box-shadow: 0 1px 3px rgba(0,0,0,.05);
+            overflow: hidden;
+        }
+        .table-card .tbl-header {
+            padding: .9rem 1.25rem .65rem;
+            border-bottom: 1px solid var(--slate-200);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        .table-card .tbl-header h2 {
+            font-size: .8rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: .05em;
+            color: var(--slate-500);
+        }
+        .table-card .tbl-header .count {
+            font-size: .75rem;
+            color: var(--slate-400);
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        thead th {
+            padding: .6rem 1.25rem;
+            text-align: left;
+            font-size: .68rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: .06em;
+            color: var(--slate-400);
+            background: var(--slate-50);
+            border-bottom: 1px solid var(--slate-200);
+        }
+        tbody td {
+            padding: .7rem 1.25rem;
+            border-bottom: 1px solid var(--slate-100);
+            vertical-align: middle;
+            font-size: .85rem;
+        }
+        tbody tr:last-child td { border-bottom: none; }
+        tbody tr {
+            transition: background .12s;
+        }
+        tbody tr:hover {
+            background: var(--slate-50);
+        }
+
+        /* ── tier badge ── */
+        .tier-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: .3rem;
+            padding: .2rem .55rem;
+            border-radius: 20px;
+            font-size: .75rem;
+            font-weight: 600;
+            white-space: nowrap;
+            letter-spacing: .01em;
+        }
+        .tier-badge.red    { background: var(--red-bg);    color: var(--red); }
+        .tier-badge.yellow { background: var(--yellow-bg); color: var(--yellow); }
+        .tier-badge.green  { background: var(--green-bg);  color: var(--green); }
+        .tier-badge .dot {
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            display: inline-block;
+        }
+        .tier-badge.red .dot    { background: var(--red); }
+        .tier-badge.yellow .dot { background: var(--yellow); }
+        .tier-badge.green .dot  { background: var(--green); }
+
+        /* ── PR link ── */
+        td.pr a {
+            color: var(--slate-800);
+            text-decoration: none;
+            font-weight: 500;
+            font-size: .85rem;
+        }
+        td.pr a:hover {
+            color: var(--indigo);
+        }
+        td.pr .meta-row {
+            display: flex;
+            align-items: center;
+            gap: .4rem;
+            margin-top: .15rem;
+        }
+        td.pr .security-tag {
+            font-size: .62rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: .04em;
+            padding: .1rem .4rem;
+            border-radius: 4px;
+            background: var(--red-bg);
+            color: var(--red);
+        }
+
+        /* ── summary ── */
+        td.summary {
+            max-width: 320px;
+            font-size: .82rem;
+            line-height: 1.45;
+            color: var(--slate-600);
+        }
+
+        /* ── actions ── */
+        td.actions { white-space: nowrap; text-align: right; }
+        .btn {
+            display: inline-block;
+            padding: .35rem .7rem;
+            margin-left: .35rem;
+            border-radius: 6px;
+            font-size: .75rem;
+            font-weight: 500;
+            text-decoration: none;
+            transition: box-shadow .12s, transform .08s;
+            line-height: 1.4;
+        }
+        .btn:hover {
+            box-shadow: 0 2px 8px rgba(0,0,0,.12);
+            transform: translateY(-1px);
+        }
+        .btn:active {
+            transform: translateY(0);
+        }
+        .btn.approve { background: var(--green); color: #fff; }
+        .btn.changes { background: var(--indigo); color: #fff; }
+        .btn.close   { background: var(--slate-400); color: #fff; }
+        .btn.close:hover { background: var(--red); }
+        .actioned {
+            display: inline-flex;
+            align-items: center;
+            gap: .25rem;
+            padding: .3rem .65rem;
+            font-size: .75rem;
+            font-weight: 500;
+            color: var(--green);
+            background: var(--green-bg);
+            border-radius: 6px;
+        }
+
+        /* ── empty state ── */
+        .empty-state {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 5rem 2rem;
+            text-align: center;
+        }
+        .empty-state .icon-ring {
+            width: 72px;
+            height: 72px;
+            border-radius: 50%;
+            background: var(--slate-100);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 1.25rem;
+            font-size: 2rem;
+        }
+        .empty-state h2 {
+            font-size: 1rem;
+            font-weight: 600;
+            color: var(--slate-700);
+            margin-bottom: .4rem;
+        }
+        .empty-state p {
+            font-size: .85rem;
+            color: var(--slate-500);
+            max-width: 380px;
+            line-height: 1.6;
+        }
+
+        /* ── footer ── */
+        footer {
+            text-align: center;
+            padding: 1.5rem;
+            font-size: .72rem;
+            color: var(--slate-400);
+        }
+
+        /* ── responsive ── */
+        @media (max-width: 800px) {
+            .stats {
+                grid-template-columns: repeat(2, 1fr);
+                gap: .65rem;
+            }
+            .stat-card { padding: .75rem 1rem; }
+            .stat-card .stat-value { font-size: 1.2rem; }
+            header { padding: 0 1rem; }
+            .page { padding: 1rem .75rem; }
+            td.summary { max-width: 160px; }
+            td.actions { white-space: normal; }
+            .btn { margin-bottom: .2rem; }
+        }
+        @media (max-width: 480px) {
+            .stats { grid-template-columns: 1fr 1fr; gap: .5rem; }
+            header .meta .pill { display: none; }
+            thead th:nth-child(3),
+            tbody td:nth-child(3) { display: none; }
+        }
     </style>
 </head>
 <body>
-<h1>PR Triage Dashboard</h1>
-<table>
-    <thead>
-    <tr><th>Tier</th><th>PR</th><th>Summary</th><th>Actions</th></tr>
-    </thead>
-    <tbody>
-    <tr th:if="${empty}">
-        <td colspan="4" class="empty">No PRs analyzed yet.</td>
-    </tr>
-    <tr th:each="r : ${rows}">
-        <td th:text="${r.tier} + ' ' + ${r.emoji}">TIER</td>
-        <td th:text="${r.pr}">PR</td>
-        <td th:text="${r.summary}">summary</td>
-        <td>
-            <span th:if="${r.actioned}" class="done">ACTIONED</span>
-            <span th:unless="${r.actioned}">
-                <a class="btn" th:href="${r.approveUrl}">Approve</a>
-                <a class="btn" th:href="${r.changesUrl}">Request changes</a>
-                <a class="btn danger" th:href="${r.closeUrl}">Close</a>
-            </span>
-        </td>
-    </tr>
-    </tbody>
-</table>
+
+<header>
+    <div class="brand">
+        <div class="mark">G</div>
+        <h1><span>glint</span> PR Triage</h1>
+    </div>
+    <div class="meta">
+        <span class="pill">Dashboard</span>
+    </div>
+</header>
+
+<div class="page">
+
+    <!-- stats row: count by tier -->
+    <div class="stats" th:unless="${empty}">
+        <div class="stat-card red">
+            <div class="stat-icon">🔴</div>
+            <div class="stat-body">
+                <span class="stat-value" th:text="${rows.?[tier == 'RED'].size()}">0</span>
+                <span class="stat-label">Needs Attention</span>
+            </div>
+        </div>
+        <div class="stat-card yellow">
+            <div class="stat-icon">🟡</div>
+            <div class="stat-body">
+                <span class="stat-value" th:text="${rows.?[tier == 'YELLOW'].size()}">0</span>
+                <span class="stat-label">Review</span>
+            </div>
+        </div>
+        <div class="stat-card green">
+            <div class="stat-icon">🟢</div>
+            <div class="stat-body">
+                <span class="stat-value" th:text="${rows.?[tier == 'GREEN'].size()}">0</span>
+                <span class="stat-label">Looks Good</span>
+            </div>
+        </div>
+        <div class="stat-card total">
+            <div class="stat-icon">📊</div>
+            <div class="stat-body">
+                <span class="stat-value" th:text="${rows.size()}">0</span>
+                <span class="stat-label">Total Reviewed</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- main table -->
+    <div class="table-card" th:unless="${empty}">
+        <div class="tbl-header">
+            <h2>Recent Analyses</h2>
+            <span class="count" th:text="${rows.size() + ' PRs'}">0 PRs</span>
+        </div>
+        <table>
+            <thead>
+            <tr>
+                <th>Tier</th>
+                <th>Pull Request</th>
+                <th>Summary</th>
+                <th>Status</th>
+                <th>Actions</th>
+            </tr>
+            </thead>
+            <tbody>
+            <tr th:each="r : ${rows}">
+                <!-- tier -->
+                <td>
+                    <span class="tier-badge" th:classappend="${r.tier == 'RED' ? 'red' : (r.tier == 'YELLOW' ? 'yellow' : 'green')}">
+                        <span class="dot"></span>
+                        <span th:text="${r.tier}">TIER</span>
+                    </span>
+                </td>
+                <!-- PR -->
+                <td class="pr">
+                    <a th:href="@{https://github.com/{pr}(pr=${r.pr})}" th:text="${r.pr}" target="_blank">PR</a>
+                    <div class="meta-row" th:if="${r.emoji == '🔒'}">
+                        <span class="security-tag">🔒 Security</span>
+                    </div>
+                </td>
+                <!-- summary -->
+                <td class="summary" th:text="${r.summary}">summary</td>
+                <!-- status -->
+                <td th:text="${r.status}">NEW</td>
+                <!-- actions -->
+                <td class="actions">
+                    <span th:if="${r.actioned}" class="actioned">✓ Done</span>
+                    <span th:unless="${r.actioned}">
+                        <a class="btn approve" th:href="${r.approveUrl}">Approve</a>
+                        <a class="btn changes" th:href="${r.changesUrl}">Changes</a>
+                        <a class="btn close"   th:href="${r.closeUrl}">Close</a>
+                    </span>
+                </td>
+            </tr>
+            </tbody>
+        </table>
+    </div>
+
+    <!-- empty state -->
+    <div th:if="${empty}" class="table-card">
+        <div class="empty-state">
+            <div class="icon-ring">📋</div>
+            <h2>No PRs analyzed yet.</h2>
+            <p>Once glint processes incoming pull requests, they'll appear here with triage tiers and one-click actions.</p>
+        </div>
+    </div>
+
+</div>
+
+<footer>
+    glint PR Triage Bot &mdash; <span th:text="${#dates.format(#dates.createNow(), 'yyyy')}">2025</span>
+</footer>
+
 </body>
 </html>

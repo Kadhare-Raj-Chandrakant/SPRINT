@@ -10,6 +10,7 @@ import com.google.gson.Gson;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.client.reactive.ReactorClientHttpConnector;
+import org.springframework.web.client.RestTemplate;
 import org.springframework.web.reactive.function.client.WebClient;
 import reactor.netty.http.client.HttpClient;
 import reactor.netty.resources.ConnectionProvider;
@@ -60,6 +61,17 @@ public class WebClientConfig {
     @Bean
     public WebClient webClient(WebClient.Builder builder) {
         return builder.build();
+    }
+
+    /**
+     * RestTemplate for simple synchronous REST calls.
+     */
+    @Bean
+    public RestTemplate restTemplate() {
+        var req = new org.springframework.http.client.SimpleClientHttpRequestFactory();
+        req.setConnectTimeout(10_000);
+        req.setReadTimeout(30_000);
+        return new RestTemplate(req);
     }
 
     /**
