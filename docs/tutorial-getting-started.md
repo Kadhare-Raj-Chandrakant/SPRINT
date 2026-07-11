@@ -43,21 +43,31 @@ GITHUB_APP_ID=123456
 GITHUB_CLIENT_ID=Iv1.xxxxx
 GITHUB_WEBHOOK_SECRET=********************************
 GITHUB_PRIVATE_KEY_PATH=certs/github-app.pem
+GITHUB_API_URL=https://api.github.com
 
-# LLM (OpenAI-compatible). ENV overrides config file.
+# LLM (OpenAI-compatible). ENV seeds the first provider in application.yaml.
+LLM_PROVIDER_TYPE=openai-compatible
 LLM_MODEL=gpt-4o-mini
 LLM_BASE_URL=https://api.openai.com/v1
-# providers are configured in application.yaml; apiKey per provider there,
-# or set LLM_API_KEY to seed the first provider.
+LLM_API_KEY=sk-...
+LLM_ENABLED=true
+LLM_TIMEOUT_SECONDS=60
+
+# App (one-click actions)
+APP_ACTION_SECRET=random-32-byte-secret-for-hmac
+APP_BASE_URL=http://localhost:8080
 
 # PostgreSQL
-DATABASE_URL=jdbc:postgresql://localhost:5432/prtriage
-DATABASE_USER=prtriage
+DATABASE_URL=jdbc:postgresql://localhost:5432/pr_triage
+DATABASE_USER=postgres
 DATABASE_PASSWORD=************
 
 # Mail (optional — skip to disable email)
 MAIL_ENABLED=false
 ```
+
+> The full, annotated list of every variable (with defaults) lives in
+> `bot/.env.example`. That file is the source of truth for configuration.
 
 Place the private key:
 

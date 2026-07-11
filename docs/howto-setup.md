@@ -31,22 +31,25 @@ Configure in `bot/src/main/resources/application.yaml` under `llm.providers`:
 
 ```yaml
 llm:
+  enabled: ${LLM_ENABLED:true}
+  timeout-seconds: ${LLM_TIMEOUT_SECONDS:60}
   providers:
-    - provider-type: openai        # currently only "openai" (OpenAI-compatible shape)
+    - provider-type: openai-compatible   # openai-compatible | nvidia-nim | ollama
       name: primary
       base-url: https://api.openai.com/v1   # or set LLM_BASE_URL (overrides)
       model: gpt-4o-mini                    # or set LLM_MODEL (overrides)
-      api-key: ${LLM_API_KEY}
-    - provider-type: openai
+      api-key: ${LLM_API_KEY}               # or set LLM_API_KEY (overrides)
+    - provider-type: nvidia-nim
       name: fallback
-      base-url: https://other-endpoint/v1
-      model: some-model
-      api-key: ${LLM_API_KEY_2}
+      base-url: http://localhost:8000
+      model: meta/llama-3.1-8b-instruct
+      api-key: ${LLM_API_KEY}
 ```
 
-- **ENV overrides**: `LLM_MODEL` and `LLM_BASE_URL` override the *first*
-  provider's `model`/`base-url`. Per-provider `api-key` is resolved from env
-  (e.g. `${LLM_API_KEY}`).
+- **ENV overrides**: `LLM_PROVIDER_TYPE`, `LLM_MODEL`, and `LLM_BASE_URL` override
+  the *first* provider's `provider-type`/`model`/`base-url`; `LLM_API_KEY`
+  seeds its `api-key`. `LLM_ENABLED` toggles the whole review path and
+  `LLM_TIMEOUT_SECONDS` sets the per-request timeout.
 - **All providers share** one `OpenAiCompatibleClient` implementation (the
   OpenAI `/chat/completions` request/response shape).
 - On a provider failure the chain moves to the next; if all fail, the review
@@ -78,7 +81,7 @@ Email is optional. When enabled, `glint` sends:
 (`TokenService`). The bot **never auto-merges**; `close` sets `state=closed`
 only.
 
-To enable actions you must set `app.action-secret` (env `ACTION_SECRET`).
+To enable actions you must set `app.action-secret` (env `APP_ACTION_SECRET`).
 Without it, `actionsEnabled` is false and no buttons are rendered. `app.base-url`
 should be the public base URL so the dashboard can build correct action links.
 

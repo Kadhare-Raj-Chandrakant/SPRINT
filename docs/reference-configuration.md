@@ -14,8 +14,8 @@ recipes.
 | `app.auto-approve` | bool | `false` | `AUTO_APPROVE` | `APPROVE` review only when **no findings**. |
 | `app.inline-comments` | bool | `true` | `INLINE_COMMENTS` | Post inline per-finding comments. |
 | `app.review-summary-enabled` | bool | `true` | `REVIEW_SUMMARY_ENABLED` | Post the markdown summary review. |
-| `app.action-secret` | string | — | `ACTION_SECRET` | Enables one-click actions when set. |
-| `app.base-url` | string | — | `BASE_URL` | Public base URL for dashboard action links. |
+| `app.action-secret` | string | — | `APP_ACTION_SECRET` | Enables one-click actions when set. |
+| `app.base-url` | string | — | `APP_BASE_URL` | Public base URL for dashboard action links. |
 
 ## `application.yaml` — `github.*` (GitHubProperties)
 
@@ -24,27 +24,31 @@ recipes.
 | `github.app-id` | string | `GITHUB_APP_ID` | Numeric App ID. |
 | `github.client-id` | string | `GITHUB_CLIENT_ID` | OAuth client id. |
 | `github.webhook-secret` | string | `GITHUB_WEBHOOK_SECRET` | HMAC verification secret. |
-| `github.private-key-path` | string | `GITHUB_PRIVATE_KEY_PATH` | Path to `.pem`. |
+| `github.private-key-path` | string | `GITHUB_PRIVATE_KEY_PATH` | Path to `.pem` (default `certs/github-app.pem`). |
 
 ## `application.yaml` — `llm.*` (LLMProperties + ProviderConfig)
 
 ```yaml
 llm:
+  enabled: ${LLM_ENABLED:true}
+  timeout-seconds: ${LLM_TIMEOUT_SECONDS:60}
   providers:
-    - provider-type: openai   # only "openai" supported (OpenAI-compatible shape)
+    - provider-type: ${LLM_PROVIDER_TYPE:openai-compatible}  # openai-compatible | nvidia-nim | ollama
       name: primary
-      base-url: https://api.openai.com/v1
-      model: gpt-4o-mini
-      api-key: ${LLM_API_KEY}
+      base-url: ${LLM_BASE_URL:http://localhost:8000}
+      model: ${LLM_MODEL:meta/llama-3.1-8b-instruct}
+      api-key: ${LLM_API_KEY:}
 ```
 
 | Key | Type | Env override | Notes |
 |---|---|---|---|
-| `llm.providers[].provider-type` | string | — | Must be `openai`. |
+| `llm.enabled` | bool | `LLM_ENABLED` | Master switch for the LLM review path. |
+| `llm.timeout-seconds` | int | `LLM_TIMEOUT_SECONDS` | Per-request timeout (≥ 1). |
+| `llm.providers[].provider-type` | string | `LLM_PROVIDER_TYPE` (1st provider) | `openai-compatible`, `nvidia-nim`, or `ollama`. |
 | `llm.providers[].name` | string | — | Logical name (used in logs). |
 | `llm.providers[].base-url` | string | `LLM_BASE_URL` (1st provider) | Endpoint base. |
 | `llm.providers[].model` | string | `LLM_MODEL` (1st provider) | Model id. |
-| `llm.providers[].api-key` | string | `${LLM_API_KEY}` etc. | Resolved from env. |
+| `llm.providers[].api-key` | string | `LLM_API_KEY` (1st provider) | Sent as `Bearer` token; empty for Ollama. |
 
 The `LLMFallbackChain` iterates `llm.providers` in list order.
 
