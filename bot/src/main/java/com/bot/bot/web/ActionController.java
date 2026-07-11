@@ -68,7 +68,7 @@ public class ActionController {
                 case "request-changes" ->
                         gitHubApiClient.submitReview(payload.owner(), payload.repo(), payload.prNumber(),
                                 "Changes requested via triage bot.", "REQUEST_CHANGES", null, installationId).block();
-                case "close" ->
+                case "close", "reject" ->
                         gitHubApiClient.closePullRequest(payload.owner(), payload.repo(), payload.prNumber(),
                                 installationId).block();
                 default -> log.warn("Unknown action in token: {}", payload.action());
