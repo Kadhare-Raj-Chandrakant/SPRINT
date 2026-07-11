@@ -5,7 +5,6 @@ import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
-import jakarta.persistence.Lob;
 import jakarta.persistence.Table;
 import lombok.Data;
 
@@ -38,11 +37,9 @@ public class PrAnalysis {
     @Column(name = "security_flag", nullable = false)
     private Boolean securityFlag;
 
-    @Lob
     @Column(columnDefinition = "TEXT")
     private String summary;
 
-    @Lob
     @Column(name = "findings_json", columnDefinition = "TEXT")
     private String findingsJson;
 
