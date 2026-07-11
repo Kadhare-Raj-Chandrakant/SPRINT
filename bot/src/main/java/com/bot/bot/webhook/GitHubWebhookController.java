@@ -68,7 +68,7 @@ public class GitHubWebhookController {
             // ── Only process pull request events ────────────────
             if (!"pull_request".equals(eventType)) {
                 log.debug("Ignoring non-PR event: {}", eventType);
-                return ResponseEntity.ok("pong");
+                return ResponseEntity.ok("Event ignored");
             }
 
             try {
