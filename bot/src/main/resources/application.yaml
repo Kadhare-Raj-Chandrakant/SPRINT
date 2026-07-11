@@ -107,6 +107,8 @@ llm:
 
 # ── Application Configuration ────────────────────────────────────────
 app:
+  action-secret: ${APP_ACTION_SECRET:}
+  base-url: ${APP_BASE_URL:}
   heuristics-enabled: ${HEURISTICS_ENABLED:true}
   llm-enabled: ${LLM_ENABLED:true}
   auto-approve: ${AUTO_APPROVE:false}

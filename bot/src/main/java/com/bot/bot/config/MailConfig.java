@@ -30,6 +30,8 @@ public class MailConfig {
         Properties javaMail = new Properties();
         javaMail.put("mail.transport.protocol", "smtp");
         javaMail.put("mail.smtp.auth", props.getUsername() != null && !props.getUsername().isBlank());
+        javaMail.put("mail.smtp.starttls.enable", "true");
+        // ponytail: Gmail :587 requires STARTTLS. If switching to :465, also add mail.smtp.socketFactory.port=465.
         sender.setJavaMailProperties(javaMail);
         return sender;
     }
