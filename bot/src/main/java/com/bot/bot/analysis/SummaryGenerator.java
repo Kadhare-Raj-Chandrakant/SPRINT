@@ -254,6 +254,12 @@ Recommendation: %s
 
         boolean isCoherent = !noClearIntent && !sweepingUnrelated;
 
+        // RED: critical security findings (secret leakage, credentials, etc.)
+        if (hasSecurityFinding) {
+            return new TriageResult(TriageResult.Tier.RED, true,
+                    TriageResult.SuggestedAction.MANUAL_CHECK);
+        }
+
         // RED: templated + sweeping-unrelated changes + no clear intent
         if (hasTemplatedSignal && sweepingUnrelated && noClearIntent) {
             return new TriageResult(TriageResult.Tier.RED, hasSecurityFinding,
@@ -275,7 +281,7 @@ Recommendation: %s
         return switch (triage.tier()) {
             case GREEN -> "Merge-worthy.";
             case YELLOW -> "Needs human review.";
-            case RED -> "Likely low-effort, consider closing.";
+            case RED -> "Requires immediate review.";
         };
     }
 }
