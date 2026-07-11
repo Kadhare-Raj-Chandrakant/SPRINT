@@ -149,7 +149,7 @@ public class ReviewOrchestrator {
         log.info("Triage tier: {} (security={}, action={})",
                 triageResult.tier(), triageResult.securityFlag(), triageResult.suggestedAction());
 
-        // Generate structured summary
+        // Generate structured summary (once)
         String summary = summaryGenerator.generateSummary(prContext, rankedFindings);
         log.info("Generated structured summary for PR {}/{}/#{}:", prContext.getOwner(), prContext.getRepo(), prContext.getPrNumber());
         log.debug(summary);
@@ -160,6 +160,10 @@ public class ReviewOrchestrator {
         log.debug("Publishing review to {}/{}/PR#{} (autoApprove={}, inline={})",
                 prContext.getOwner(), prContext.getRepo(), prContext.getPrNumber(),
                 autoApprove, inlineComments);
+
+        // Persist BEFORE publishing: a transient GitHub API failure must not lose
+        // the analysis (otherwise no dedupe row exists and no retry ever fires).
+        PrAnalysis saved = persistAnalysis(prContext, rankedFindings, triageResult, summary);
 
         return reviewPublisher.publishReview(
                         prContext.getOwner(), prContext.getRepo(), prContext.getPrNumber(),
@@ -172,26 +176,17 @@ public class ReviewOrchestrator {
                 })
                 .doOnError(e -> log.error("Error publishing review for {}/{}/PR#{}",
                         prContext.getOwner(), prContext.getRepo(), prContext.getPrNumber(), e))
-                .then(Mono.defer(() ->
-                        persistAndAlert(prContext, rankedFindings, triageResult, summary)));
-    }
-
-    /**
-     * Persist the completed analysis (findings + tier) for later reporting and dedupe,
-     * then fire an immediate alert if the PR is urgent (RED tier / security flag).
-     */
-    private Mono<Void> persistAndAlert(PullRequestContext prContext, List<Finding> findings,
-                                        TriageResult triageResult, String summary) {
-        PrAnalysis saved = persistAnalysis(prContext, findings, triageResult, summary);
-        if (saved != null) {
-            try {
-                thresholdAlertService.maybeAlert(saved);
-            } catch (Exception e) {
-                log.error("Failed to send threshold alert for {}/{}/PR#{}",
-                        prContext.getOwner(), prContext.getRepo(), prContext.getPrNumber(), e);
-            }
-        }
-        return Mono.empty();
+                .then(Mono.defer(() -> {
+                    if (saved != null) {
+                        try {
+                            thresholdAlertService.maybeAlert(saved);
+                        } catch (Exception e) {
+                            log.error("Failed to send threshold alert for {}/{}/PR#{}",
+                                    prContext.getOwner(), prContext.getRepo(), prContext.getPrNumber(), e);
+                        }
+                    }
+                    return Mono.empty();
+                }));
     }
 
     /**

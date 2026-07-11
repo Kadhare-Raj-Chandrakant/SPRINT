@@ -6,6 +6,8 @@ import org.springframework.scheduling.annotation.EnableAsync;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 
 import java.util.concurrent.Executor;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 /**
  * Configures a dedicated thread pool for asynchronous PR review processing.
@@ -27,5 +29,14 @@ public class AsyncConfig {
         executor.setAwaitTerminationSeconds(30);
         executor.initialize();
         return executor;
+    }
+
+    /**
+     * Shared pool for parallel heuristic rule execution. Injected into
+     * HeuristicsAnalysisEngine so we don't spin up a fresh thread pool per PR.
+     */
+    @Bean("heuristicExecutor")
+    public ExecutorService heuristicExecutor() {
+        return Executors.newFixedThreadPool(6);
     }
 }

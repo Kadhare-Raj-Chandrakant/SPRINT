@@ -19,6 +19,8 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Base64;
 import java.util.List;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
@@ -42,11 +44,16 @@ public class GitHubApiClient {
     private final WebClient webClient;
     private final Gson gson;
 
-    // Installation token cache
-    private volatile String cachedInstallationToken;
-    private volatile Instant tokenExpiry = Instant.EPOCH;
-    private volatile long cachedInstallationId;
+    // Per-installation cache: a GitHub App often serves multiple orgs, so a
+    // single-slot token cache would let concurrent requests clobber each other.
+    private final Map<Long, CachedToken> installationTokenCache = new ConcurrentHashMap<>();
     private static final Duration TOKEN_CACHE_TTL = Duration.ofMinutes(55);
+
+    private record CachedToken(String token, Instant expiry) {
+        boolean isValid() {
+            return Instant.now().isBefore(expiry);
+        }
+    }
 
     private static final long MAX_FILE_BYTES = 64 * 1024;
 
@@ -120,10 +127,9 @@ public class GitHubApiClient {
         }
 
         // Return cached token if still valid for this installation
-        if (installationId == cachedInstallationId
-                && Instant.now().isBefore(tokenExpiry)
-                && cachedInstallationToken != null) {
-            return Mono.just(cachedInstallationToken);
+        CachedToken cached = installationTokenCache.get(installationId);
+        if (cached != null && cached.isValid()) {
+            return Mono.just(cached.token());
         }
 
         String url = gitHubProperties.getApiUrl() + "/app/installations/" + installationId + "/access_tokens";
@@ -138,10 +144,10 @@ public class GitHubApiClient {
                     try {
                         JsonObject json = gson.fromJson(response, JsonObject.class);
                         String token = json.get("token").getAsString();
-                        cachedInstallationToken = token;
-                        cachedInstallationId = installationId;
-                        tokenExpiry = Instant.now().plus(TOKEN_CACHE_TTL);
-                        log.info("Obtained installation access token (cached until {})", tokenExpiry);
+                        Instant expiry = Instant.now().plus(TOKEN_CACHE_TTL);
+                        installationTokenCache.put(installationId, new CachedToken(token, expiry));
+                        log.info("Obtained installation access token for installation {} (cached until {})",
+                                installationId, expiry);
                         return token;
                     } catch (Exception e) {
                         log.error("Failed to parse installation token response", e);

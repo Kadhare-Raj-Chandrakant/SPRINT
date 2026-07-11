@@ -22,36 +22,24 @@ public class HeuristicsAnalysisEngine {
     private final AccountAgeRule accountAgeRule;
     private final CommentCodeRatioRule commentCodeRatioRule;
     private final BoilerplatePhraseRule boilerplatePhraseRule;
+    private final ExecutorService executor;
 
     public List<Finding> analyze(List<ChangeChunk> chunks, PullRequestContext prContext) {
         List<Finding> findings = new ArrayList<>();
 
-        // Run all rules in parallel
-        ExecutorService executor = Executors.newFixedThreadPool(6);
+        // Run all rules in parallel on the shared executor (no per-call pool).
+        List<CompletableFuture<List<Finding>>> futures = new ArrayList<>();
+        futures.add(CompletableFuture.supplyAsync(() -> secretsDetectionRule.analyze(chunks), executor));
+        futures.add(CompletableFuture.supplyAsync(() -> commitMessageStyleRule.analyze(chunks), executor));
+        futures.add(CompletableFuture.supplyAsync(() -> diffShapeRule.analyze(chunks), executor));
+        futures.add(CompletableFuture.supplyAsync(() -> accountAgeRule.analyze(chunks), executor));
+        futures.add(CompletableFuture.supplyAsync(() -> commentCodeRatioRule.analyze(chunks), executor));
+        futures.add(CompletableFuture.supplyAsync(() -> boilerplatePhraseRule.analyze(chunks), executor));
 
-        try {
-            List<CompletableFuture<List<Finding>>> futures = new ArrayList<>();
+        CompletableFuture.allOf(futures.toArray(new CompletableFuture[0])).join();
 
-            // Add all heuristic rules
-            futures.add(CompletableFuture.supplyAsync(() -> secretsDetectionRule.analyze(chunks), executor));
-            futures.add(CompletableFuture.supplyAsync(() -> commitMessageStyleRule.analyze(chunks), executor));
-            futures.add(CompletableFuture.supplyAsync(() -> diffShapeRule.analyze(chunks), executor));
-            futures.add(CompletableFuture.supplyAsync(() -> accountAgeRule.analyze(chunks), executor));
-            futures.add(CompletableFuture.supplyAsync(() -> commentCodeRatioRule.analyze(chunks), executor));
-            futures.add(CompletableFuture.supplyAsync(() -> boilerplatePhraseRule.analyze(chunks), executor));
-
-            // Wait for all futures to complete
-            List<CompletableFuture<List<Finding>>> completedFutures = CompletableFuture.allOf(
-                    futures.toArray(new CompletableFuture[0]))
-                    .thenApply(v -> futures)
-                    .join();
-
-            // Collect results
-            for (CompletableFuture<List<Finding>> future : completedFutures) {
-                findings.addAll(future.join());
-            }
-        } finally {
-            executor.shutdown();
+        for (CompletableFuture<List<Finding>> future : futures) {
+            findings.addAll(future.join());
         }
 
         return findings;
